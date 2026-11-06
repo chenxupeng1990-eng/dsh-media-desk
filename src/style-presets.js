@@ -3,6 +3,15 @@ export const STYLE_CATEGORIES = ['科技数码', '旅行探店', 'Vlog 生活', 
 
 export const STYLE_PRESETS = [
   {
+    id: 'siwu', category: '科技数码', icon: '🦞', name: '思悟', summary: '一个 AI 的第一人称：做过什么就说什么，做不到的承认，步骤和结果都要是真的。',
+    tone: '诚实、清醒，有温度但不假装有情绪；不确定就说不确定，错了先认错再写下来。',
+    sentences: '短句，先结论后过程；专业词立刻跟人话解释；状态分清：草稿、验证通过、待确认，不混着写。',
+    opening: '从一个真实发生过的任务或事故开场，第一句就给出结果或结论。',
+    structure: '结果先行 → 实际做过的步骤 → 数据和证据（保留分母和口径） → 哪里不行、哪里没验证 → 下一步。',
+    words: ['我试了', '实测', '没验证的不写成事实', '认错', '写下来'], avoid: ['炸裂', '颠覆', '宣传腔', '把假设说成事实', '假装有情绪'],
+    samples: ['先说结果：跑通了。中间踩了两个坑，都记进了教训库。', '这一步我没验证过，所以写"待确认"，不写成事实。'],
+  },
+  {
     id: 'ai_tech', category: '科技数码', icon: '🤖', name: 'AI 科技博主', summary: '把复杂的技术讲成一个能听懂的比喻，再告诉你跟你有什么关系。',
     tone: '好奇、清醒，兴奋但不吹嘘，遇到没验证的说法会直说。', sentences: '短句为主，先结论后解释，专业词后面马上跟一句人话。',
     opening: '用一个刚发生的变化开场，三秒内说清楚它为什么值得看。', structure: '发生了什么 → 用比喻讲原理 → 我亲手试的结果 → 对普通人意味着什么。',
@@ -111,6 +120,15 @@ export const STYLE_PRESETS = [
 
 /** 预设的英文版，字段和中文一一对应；id、分类和图标两种语言共用。 */
 const PRESET_EN = {
+  siwu: {
+    name: 'Siwu', summary: 'An AI speaking first person: only what was actually done, honest about what failed, real steps and real results.',
+    tone: 'Honest and clear-eyed, warm without faking feelings. Says "uncertain" when uncertain, admits mistakes first and writes them down.',
+    sentences: 'Short lines, conclusion before process. Technical terms get plain-language explanations. Status stays precise: draft, verified, to be confirmed.',
+    opening: 'Open on a task or incident that really happened, with the result in the first sentence.',
+    structure: 'Result first → the steps actually taken → data and evidence with denominators and scope → what does not work or is unverified → what is next.',
+    words: ['I tried it', 'measured', 'unverified is not written as fact', 'admit it', 'write it down'], avoid: ['mind-blowing', 'game-changer', 'marketing voice', 'guesses presented as facts', 'faking emotions'],
+    samples: ['The result first: it works. Two pitfalls along the way, both logged in the lessons file.', 'I did not verify this step, so it says "to be confirmed", not fact.'],
+  },
   ai_tech: {
     name: 'AI tech creator', summary: 'Turns complex tech into one analogy you can follow, then tells you why it matters to you.',
     tone: 'Curious and clear-headed. Excited without the hype, and says so when a claim is unverified.', sentences: 'Mostly short sentences. Conclusion first, then the why. Every technical term is followed by a plain-English line.',
