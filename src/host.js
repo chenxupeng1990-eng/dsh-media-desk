@@ -165,7 +165,13 @@ export function parseDraft(markdown) {
       const [visual, voice = ''] = line.replace(/^\d+[.、]\s*/, '').split('|').map(part => part.trim())
       if (!visual) continue
       if (heading === '## 分镜') shots.push({ no: index + 1, shot: '画面', visual, voice, seconds: 5, prompt: visual, status: 'idle' })
-      else gallery.push({ caption: visual.slice(0, 24), prompt: voice || visual, status: 'idle' })
+      else {
+        const file = /^file:(.+)$/.exec(voice || visual)
+        // file:卡片-01.png → 直接引用工作台 files 里已生成的 PNG，不走生图
+        gallery.push(file
+          ? { caption: visual.slice(0, 40), src: `media-desk/files/${file[1].trim()}`, status: 'done', file: true }
+          : { caption: visual.slice(0, 24), prompt: voice || visual, status: 'idle' })
+      }
     }
   }
   return { meta, body, shots, gallery }
@@ -213,15 +219,20 @@ export async function scanInbox(store, desk) {
             targets.push('cover')
           }
           if (parsed.shots.length && (redraw.includes('shots') || !prod.shots?.length)) {
-            prod.shots = parsed.shots.slice(0, 12)
+            prod.shots = parsed.shots
             prod.shots.forEach((_, index) => targets.push(`shot:${index}`))
           }
-          // 图文模式：## 图文 段落的每张内页图（caption 存图上大字），交给生图链路画底图
+          // 图文模式：## 图文 段落建内页图；file: 前缀引用已生成的 PNG，直接入库不触发生图
           if (parsed.gallery.length && (redraw.includes('gallery') || !prod.images?.length)) {
-            prod.images = parsed.gallery.slice(0, 9)
-            prod.images.forEach((_, index) => targets.push(`image:${index}`))
+            prod.images = parsed.gallery
+            prod.images.forEach((image, index) => { if (image.file) targets.push(`image:${index}`) })
           }
           if (parsed.gallery.length) prod.mode = 'gallery'
+        } else if (parsed.gallery.some(row => row.file)) {
+          // 没接生图也能收 file: 图：直接入库
+          const prod = item.production
+          prod.images = parsed.gallery
+          prod.mode = 'gallery'
         }
         return { receipts, errors: [], state: draft }
       }, { undoable: false })
