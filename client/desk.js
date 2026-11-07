@@ -353,6 +353,18 @@ export async function fetchInsights() {
   return request('insights')
 }
 
+/** 把灵感导出到收件箱（~/.dsh/media-desk/inbox），等主会话的 agent 取件写成稿。 */
+export async function exportDraft(id) {
+  try {
+    const data = await request('export-draft', { id })
+    toast(t('已放进收件箱，主会话的思悟会取件写成稿，写完自动回填这里'))
+    return data
+  } catch (err) {
+    report(err)
+    return null
+  }
+}
+
 /** 拉起 ego-browser 抓三个创作中心的后台数据并回填。 */
 export async function runScrape() {
   try {

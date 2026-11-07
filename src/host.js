@@ -1,7 +1,7 @@
 // dsh-media-desk host 半片：/media-desk/* 接口、文件服务和模型调用。
 import { createReadStream } from 'node:fs'
 import { execFile, spawn } from 'node:child_process'
-import { access, open, stat, writeFile } from 'node:fs/promises'
+import { access, mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -94,6 +94,107 @@ function engineLabel(ctx) {
 }
 
 const SCRAPE_SCRIPT = join(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'scrape-creator-centers.mjs')
+
+// ── 成稿文件桥：灵感导出到 inbox/，主会话的 agent 写完放回，扫描器自动入库 ──
+
+const inboxDir = root => join(root, 'inbox')
+const doneDir = root => join(root, 'inbox', 'done')
+
+function styleBrief(style) {
+  if (!style) return tr('（未指定风格，按平台常规写法）')
+  const lines = [
+    tr('- 一句话：{v}', { v: style.summary ?? '' }),
+    tr('- 语气：{v}', { v: style.tone ?? '' }),
+    tr('- 句式：{v}', { v: style.sentences ?? '' }),
+    tr('- 开场：{v}', { v: style.opening ?? '' }),
+    tr('- 结构：{v}', { v: style.structure ?? '' }),
+    tr('- 常用词：{v}', { v: (style.words ?? []).join('、') }),
+    tr('- 禁用词：{v}', { v: (style.avoid ?? []).join('、') }),
+    ...(style.samples ?? []).length ? [tr('- 样句：{v}', { v: style.samples.join(' / ') })] : [],
+  ]
+  return [tr('风格「{name}」：', { name: style.name }), ...lines].join('\n')
+}
+
+/** 导出一条灵感到 inbox，等主会话的 agent 取件写作。重复导出会覆盖旧任务。 */
+export async function exportDraft(store, body) {
+  const state = await store.read()
+  const item = state.items.find(row => row.id === body.id)
+  if (!item) throw Object.assign(new Error(tr('灵感不存在')), { status: 404 })
+  if (item.production?.status === 'running') throw Object.assign(new Error(tr('这条灵感正在成稿，等它结束')), { status: 409 })
+  const style = state.styles?.find(row => row.id === state.activeStyleId) ?? state.styles?.find(row => row.preset && item.platform && row.category) ?? null
+  const brief = [
+    '---',
+    `itemId: ${item.id}`,
+    `platform: ${item.platform ?? ''}`,
+    `styleName: ${style?.name ?? ''}`,
+    `createdAt: ${new Date().toISOString()}`,
+    '---',
+    '',
+    `# ${item.title}`,
+    '',
+    item.body ?? '',
+    '',
+    '## 风格卡',
+    '',
+    styleBrief(style),
+  ].join('\n')
+  await mkdir(inboxDir(store.root), { recursive: true })
+  const file = join(inboxDir(store.root), `任务-${item.id}.md`)
+  await writeFile(file, brief, 'utf8')
+  return { path: file, itemId: item.id }
+}
+
+/** 解析成稿文件的 frontmatter 和正文。 */
+function parseDraft(markdown) {
+  const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(markdown)
+  if (!match) return null
+  const meta = {}
+  for (const line of match[1].split('\n')) {
+    const pair = /^(\w+):\s*(.*)$/.exec(line.trim())
+    if (pair) meta[pair[1]] = pair[2].trim()
+  }
+  return { meta, body: match[2].trim() }
+}
+
+/** 扫描 inbox 里的成稿文件，回填到对应灵感并归档。 */
+export async function scanInbox(store) {
+  let files = []
+  try {
+    files = (await readdir(inboxDir(store.root))).filter(name => /^成稿-[\w-]+\.md$/.test(name))
+  } catch {
+    return
+  }
+  for (const name of files) {
+    try {
+      const parsed = parseDraft(await readFile(join(inboxDir(store.root), name), 'utf8'))
+      const itemId = parsed?.meta.itemId
+      if (!parsed || !itemId) throw new Error(tr('frontmatter 缺 itemId'))
+      const revise = {
+        title: parsed.meta.title,
+        coverText: parsed.meta.coverText,
+        article: parsed.body,
+      }
+      const label = tr('思悟成稿入库：{title}', { title: String(revise.title || name).slice(0, 20) })
+      await store.mutate(label, (draft) => {
+        const item = draft.items.find(row => row.id === itemId)
+        if (!item) throw new Error(tr('灵感 {id} 不存在，成稿文件留在 inbox', { id: itemId }))
+        if (item.production?.status === 'running') throw new Error(tr('灵感 {id} 正在成稿，跳过回填', { id: itemId }))
+        if (!item.production || item.production.stage === 'brief') {
+          // 还没成过稿：直接建一个纯文本成稿，图留给工作台的生图链路
+          item.production = { status: 'done', stage: 'making', title: item.title, article: '', coverText: '', cover: null, images: [], shots: [], startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), external: true }
+        }
+        const { receipts } = applyRevision(item.production, revise, { canDraw: false })
+        item.production.external = true
+        return { receipts, errors: [], state: draft }
+      }, { undoable: false })
+      await mkdir(doneDir(store.root), { recursive: true })
+      await rename(join(inboxDir(store.root), name), join(doneDir(store.root), name))
+    } catch (err) {
+      // 单个文件失败不阻塞其他文件；错误留在原位等人工看
+      console.error('[media-desk] inbox 回填失败:', name, err.message)
+    }
+  }
+}
 
 /**
  * 拉起 ego-browser 跑创作中心抓取脚本，返回 SCRAPE_RESULT 摘要。
@@ -434,6 +535,7 @@ async function route(ctx, store, desk, req, res) {
       return json(res, 200, { path })
     }
     case 'style/extract': return json(res, 200, await extractStyle(ctx, store, body))
+    case 'export-draft': return json(res, 200, await exportDraft(store, body))
     case 'scrape': {
       const result = await runScrape(desk)
       return json(res, 200, { ...result, state: await store.read() })
@@ -505,6 +607,10 @@ export default {
     const desk = { settings, producer, monid, storeRoot: store.root }
     // 启动时恢复用户在工作台里选过的助手模型
     settings.read().then(saved => setAssistantModel(saved.assistant)).catch(() => {})
+    // 成稿文件桥：启动扫一次，之后每 20 秒看一眼 inbox。unref 让定时器不持事件循环，测试进程能正常退出。
+    const inboxTimer = setInterval(() => { scanInbox(store).catch(() => {}) }, 20_000)
+    inboxTimer.unref?.()
+    scanInbox(store).catch(() => {})
     ctx.effect(() => ctx.webServer.register({
       kind: 'prefix',
       path: '/media-desk',
@@ -525,5 +631,6 @@ export default {
         }
       },
     }), 'dsh-media-desk: /media-desk routes')
+    return () => clearInterval(inboxTimer)
   },
 }

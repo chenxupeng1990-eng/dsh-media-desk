@@ -59,4 +59,9 @@ export const CORE = {
   '抓取后台数据': 'Fetch creator-center data',
   '正在抓取后台数据…': 'Fetching creator-center data…',
   '抓取完成：新写入 {n} 条': 'Fetch complete: {n} new rows',
+
+  // 成稿文件桥
+  '交给我写': 'Hand to Siwu',
+  '导出到收件箱，由主会话的思悟带着全部技能和记忆来写': 'Export to the inbox; Siwu in the main session writes it with full skills and memory.',
+  '已放进收件箱，主会话的思悟会取件写成稿，写完自动回填这里': 'Queued in the inbox. Siwu in the main session will pick it up; the draft lands back here automatically.',
 }

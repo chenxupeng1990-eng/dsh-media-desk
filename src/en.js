@@ -218,4 +218,20 @@ export const EN = {
   '上一次抓取还没结束，等它跑完再试': 'The previous fetch is still running. Wait for it to finish.',
   '抓取超时（5 分钟），ego 浏览器可能没开': 'Fetch timed out (5 min). The ego browser may not be running.',
   '抓取脚本没有给出结果：{tail}': 'The fetch script returned no result: {tail}',
+
+  // 成稿文件桥
+  '（未指定风格，按平台常规写法）': '(No style set; write in the platform\'s usual manner.)',
+  '风格「{name}」：': 'Style "{name}":',
+  '- 一句话：{v}': '- In one line: {v}',
+  '- 语气：{v}': '- Tone: {v}',
+  '- 句式：{v}': '- Sentences: {v}',
+  '- 开场：{v}': '- Opening: {v}',
+  '- 结构：{v}': '- Structure: {v}',
+  '- 常用词：{v}': '- Pet phrases: {v}',
+  '- 禁用词：{v}': '- Banned: {v}',
+  '- 样句：{v}': '- Sample lines: {v}',
+  'frontmatter 缺 itemId': 'frontmatter is missing itemId',
+  '灵感 {id} 不存在，成稿文件留在 inbox': 'Idea {id} no longer exists; the draft file stays in the inbox',
+  '灵感 {id} 正在成稿，跳过回填': 'Idea {id} is being drafted in the workbench; skipping this import',
+  '思悟成稿入库：{title}': 'Siwu draft imported: {title}',
 }
