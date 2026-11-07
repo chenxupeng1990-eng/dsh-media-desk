@@ -818,3 +818,9 @@ button.md-receipt:hover { transform: translateX(2px); }
 .md-node.is-dim { opacity: .28; filter: saturate(.5); }
 .md-hero-related { margin-top: 10px; display: flex; gap: 10px; align-items: baseline; color: var(--ink2); font-size: 12.5px; line-height: 18px; animation: md-rise .5s var(--ease) both; }
 
+/* 小红书图文卡片 */
+.md-gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.md-gallery-card { margin: 0; }
+.md-gallery-card img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: var(--radius, 14px); cursor: zoom-in; }
+.md-gallery-card figcaption { margin-top: 6px; color: var(--ink3); font-size: 12px; line-height: 18px; }
+.md-gallery-loading { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 3 / 4; border-radius: var(--radius, 14px); background: color-mix(in srgb, var(--card) 60%, transparent); color: var(--ink3); font-size: 12px; }

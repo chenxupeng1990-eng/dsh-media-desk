@@ -64,4 +64,11 @@ export const CORE = {
   '交给我写': 'Hand to Siwu',
   '导出到收件箱，由主会话的思悟带着全部技能和记忆来写': 'Export to the inbox; Siwu in the main session writes it with full skills and memory.',
   '已放进收件箱，主会话的思悟会取件写成稿，写完自动回填这里': 'Queued in the inbox. Siwu in the main session will pick it up; the draft lands back here automatically.',
+
+  // 图文模式
+  '图文卡片': 'Gallery cards',
+  '正在合成图上文字…': 'Composing card text…',
+  '{n} 张': '{n} cards',
+  '正在画…': 'Drawing…',
+  '等待底图…': 'Waiting for artwork…',
 }

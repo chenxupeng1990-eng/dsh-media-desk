@@ -155,17 +155,20 @@ export function parseDraft(markdown) {
   }
   let body = match[2].trim()
   const shots = []
-  const shotsAt = body.indexOf('## 分镜')
-  if (shotsAt >= 0) {
-    const shotsText = body.slice(shotsAt + '## 分镜'.length).trim()
-    body = body.slice(0, shotsAt).trim()
-    for (const [index, line] of shotsText.split('\n').map(row => row.trim()).filter(Boolean).entries()) {
+  const gallery = []
+  for (const [heading, sink] of [['## 分镜', shots], ['## 图文', gallery]]) {
+    const at = body.indexOf(heading)
+    if (at < 0) continue
+    const text = body.slice(at + heading.length).trim()
+    body = body.slice(0, at).trim()
+    for (const [index, line] of text.split('\n').map(row => row.trim()).filter(Boolean).entries()) {
       const [visual, voice = ''] = line.replace(/^\d+[.、]\s*/, '').split('|').map(part => part.trim())
       if (!visual) continue
-      shots.push({ no: index + 1, shot: '画面', visual, voice, seconds: 5, prompt: visual, status: 'idle' })
+      if (heading === '## 分镜') shots.push({ no: index + 1, shot: '画面', visual, voice, seconds: 5, prompt: visual, status: 'idle' })
+      else gallery.push({ caption: visual.slice(0, 24), prompt: voice || visual, status: 'idle' })
     }
   }
-  return { meta, body, shots }
+  return { meta, body, shots, gallery }
 }
 
 /** 扫描 inbox 里的成稿文件，回填到对应灵感并触发缺图重画。 */
@@ -213,6 +216,12 @@ export async function scanInbox(store, desk) {
             prod.shots = parsed.shots.slice(0, 12)
             prod.shots.forEach((_, index) => targets.push(`shot:${index}`))
           }
+          // 图文模式：## 图文 段落的每张内页图（caption 存图上大字），交给生图链路画底图
+          if (parsed.gallery.length && (redraw.includes('gallery') || !prod.images?.length)) {
+            prod.images = parsed.gallery.slice(0, 9)
+            prod.images.forEach((_, index) => targets.push(`image:${index}`))
+          }
+          if (parsed.gallery.length) prod.mode = 'gallery'
         }
         return { receipts, errors: [], state: draft }
       }, { undoable: false })
