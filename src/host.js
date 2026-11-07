@@ -225,7 +225,7 @@ export async function scanInbox(store, desk) {
           // 图文模式：## 图文 段落建内页图；file: 前缀引用已生成的 PNG，直接入库不触发生图
           if (parsed.gallery.length && (redraw.includes('gallery') || !prod.images?.length)) {
             prod.images = parsed.gallery
-            prod.images.forEach((image, index) => { if (image.file) targets.push(`image:${index}`) })
+            prod.images.forEach((image, index) => { if (!image.file) targets.push(`image:${index}`) })
           }
           if (parsed.gallery.length) prod.mode = 'gallery'
         } else if (parsed.gallery.some(row => row.file)) {
