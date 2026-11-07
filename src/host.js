@@ -1,7 +1,7 @@
 // dsh-media-desk host 半片：/media-desk/* 接口、文件服务和模型调用。
 import { createReadStream } from 'node:fs'
 import { execFile, spawn } from 'node:child_process'
-import { access, mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { access, mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -94,6 +94,67 @@ function engineLabel(ctx) {
 }
 
 const SCRAPE_SCRIPT = join(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'scrape-creator-centers.mjs')
+
+const PUBLISH_SCRIPT = join(dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'publish-xhs.mjs')
+
+/**
+ * 拉起 ego-browser 发布小红书图文笔记。按钮点击即授权，成功后不重复发。
+ * 任务通过 MEDIA_DESK_PUBLISH_TASK JSON 文件传给脚本（ego 的 stdin 被脚本本身占用）。
+ */
+async function runPublish(store, desk, body) {
+  if (desk.publishing) throw Object.assign(new Error(tr('上一次发布还没结束，等它完成')), { status: 409 })
+  desk.publishing = true
+  const taskFile = join(store.root, `publish-task-${process.pid}.json`)
+  try {
+    const state = await store.read()
+    const item = state.items.find(row => row.id === body.id)
+    if (!item) throw Object.assign(new Error(tr('灵感不存在')), { status: 404 })
+    const production = item.production
+    if (!production?.article) throw Object.assign(new Error(tr('还没有可以发布的成稿')), { status: 400 })
+    if (item.status === 'published') throw Object.assign(new Error(tr('这条已经发布过了')), { status: 409 })
+    const images = (production.images ?? []).filter(row => row.src).map(row => join(store.root, row.src.replace('media-desk/', '')))
+    if (!images.length) throw Object.assign(new Error(tr('没有可上传的图片')), { status: 400 })
+    for (const file of images) await access(file).catch(() => { throw Object.assign(new Error(tr('图片文件缺失，先在工作台保存一次')), { status: 400 }) })
+    const payload = { title: production.title ?? item.title, article: production.article, images }
+    await writeFile(taskFile, JSON.stringify(payload), 'utf8')
+    const candidates = ['ego-browser', join(homedir(), '.local', 'bin', 'ego-browser')]
+    let bin = null
+    for (const c of candidates) {
+      try { await access(c); bin = c; break } catch { /* 下一个 */ }
+    }
+    if (!bin) bin = candidates[0]
+    const scriptIn = await open(PUBLISH_SCRIPT, 'r')
+    try {
+      const output = await new Promise((resolve, reject) => {
+        const child = spawn(bin, ['nodejs', PUBLISH_SCRIPT], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MEDIA_DESK_PUBLISH_TASK: taskFile } })
+        let text = ''
+        const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error(tr('发布超时（6 分钟），ego 浏览器可能没开'))) }, 360_000)
+        child.stdout.on('data', d => { text += d })
+        child.stderr.on('data', d => { text += d })
+        child.on('error', err => { clearTimeout(timer); reject(err) })
+        child.on('close', () => { clearTimeout(timer); resolve(text) })
+      })
+      const match = /^PUBLISH_RESULT (\{[\s\S]+\})$/m.exec(output)
+      if (!match) throw new Error(tr('发布脚本没有给出结果：{tail}', { tail: output.trim().slice(-300) }))
+      const result = JSON.parse(match[1])
+      if (!result.ok) throw Object.assign(new Error(result.error ?? tr('发布失败')), { status: 502 })
+      const saved = await store.mutate(tr('发布小红书笔记'), (draft) => {
+        const target = draft.items.find(row => row.id === body.id)
+        if (!target) throw new Error(tr('灵感不存在'))
+        target.status = 'published'
+        target.publishedAt = new Date().toISOString()
+        target.production.publishedUrl = result.url
+        return { receipts: [{ text: tr('已发布到小红书') }], errors: [], state: draft }
+      }, { undoable: false })
+      return { ...result, state: saved.state }
+    } finally {
+      await scriptIn.close().catch(() => {})
+      await rm(taskFile, { force: true }).catch(() => {})
+    }
+  } finally {
+    desk.publishing = false
+  }
+}
 
 // ── 成稿文件桥：灵感导出到 inbox/，主会话的 agent 写完放回，扫描器自动入库 ──
 
@@ -591,6 +652,7 @@ async function route(ctx, store, desk, req, res) {
     }
     case 'style/extract': return json(res, 200, await extractStyle(ctx, store, body))
     case 'export-draft': return json(res, 200, await exportDraft(store, body))
+    case 'publish': return json(res, 200, await runPublish(store, desk, body))
     case 'scrape': {
       const result = await runScrape(desk)
       return json(res, 200, { ...result, state: await store.read() })

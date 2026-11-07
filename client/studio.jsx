@@ -2,7 +2,7 @@
 import React from 'react'
 import { ChatPanel } from './chat.jsx'
 import { downloadCover } from './cover.js'
-import { cancelProduce, closeItem, dispatchOps, exportDraft, regenAsset, revealSaved, runProduce, saveProduced, setDesk, toast, useDesk, watchProduction } from './desk.js'
+import { cancelProduce, closeItem, dispatchOps, exportDraft, regenAsset, revealSaved, runProduce, runPublish, saveProduced, setDesk, toast, useDesk, watchProduction } from './desk.js'
 import { plural, t } from './i18n.js'
 import { Icon, IconButton } from './ui.jsx'
 import { SPRING_SNAP, SPRING_SOFT, STYLE_CATEGORIES, fmtDate, fmtWhen, reducedMotion, renderMarkdown, styleIcon, textLength, toLocalInput } from './util.js'
@@ -165,6 +165,14 @@ function HeroTile({ item, live, onView }) {
       onSubmit: () => runProduce(item.id),
     },
   })
+  const confirmPublish = () => setDesk({
+    dialog: {
+      title: t('发布到小红书'),
+      submitLabel: t('确认发布'),
+      fields: [{ name: 'note', label: t('将在 ego 浏览器里自动填写标题、正文并上传图片，点击确认后直接发布，不再二次确认。'), type: 'hidden' }],
+      onSubmit: () => runPublish(item.id),
+    },
+  })
   const figures = images.length ? images : [null, null].slice(0, settings?.imageCount ?? 2)
   return (
     <section className={`md-tile md-tile-hero ${running ? 'is-running' : ''}`}>
@@ -188,6 +196,7 @@ function HeroTile({ item, live, onView }) {
                 dispatchOps([{ op: 'schedule_item', id: item.id, scheduledAt: when }], { label: t('修改排期'), silent: true })
               }} />
             </label>
+            {item.status !== 'published' ? <button type="button" className="md-pill" onClick={confirmPublish}><Icon name="upRight" size={14} />{t('发布')}</button> : <span className="md-pill">{t('已发布')}</span>}
           </div>
         ) : null}
       </div>

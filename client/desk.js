@@ -353,6 +353,19 @@ export async function fetchInsights() {
   return request('insights')
 }
 
+/** 一键发布到小红书：在 ego 浏览器里自动填写并直接发布（按钮点击即授权）。 */
+export async function runPublish(id) {
+  try {
+    const data = await request('publish', { id })
+    setDesk({ state: data.state })
+    toast(t('已发布到小红书'))
+    return data
+  } catch (err) {
+    report(err)
+    return null
+  }
+}
+
 /** 把灵感导出到收件箱（~/.dsh/media-desk/inbox），等主会话的 agent 取件写成稿。 */
 export async function exportDraft(id) {
   try {
