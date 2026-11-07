@@ -7,6 +7,8 @@ const DEFAULTS = {
   image: { baseUrl: '', model: '', apiKey: '', size: '1536x1024', quality: '', extra: '' },
   // 助手文字模型：空对象表示跟随 DeepSeek Harness 默认模型
   assistant: { provider: '', model: '' },
+  // 助手映射到的 Harness 会话 id：空 = 不映射（用插件自带提示词 + 可解析指令）
+  assistantSession: '',
   voice: '',
   exportDir: '',
   imageCount: 2,
@@ -72,6 +74,7 @@ export class Settings {
       if (Boolean(provider) !== Boolean(model)) throw Object.assign(new Error(tr('助手模型的提供方和模型要一起填')), { status: 400 })
       next.assistant = { provider, model }
     }
+    if (typeof patch.assistantSession === 'string') next.assistantSession = patch.assistantSession.trim().slice(0, 200)
     if (typeof patch.voice === 'string') next.voice = patch.voice.slice(0, 8000)
     if (typeof patch.exportDir === 'string') next.exportDir = patch.exportDir.trim().slice(0, 500)
     if (patch.imageCount !== undefined) next.imageCount = clamp(patch.imageCount, 0, 4, current.imageCount)

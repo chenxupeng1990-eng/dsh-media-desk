@@ -366,6 +366,26 @@ export async function runPublish(id) {
   }
 }
 
+/** 列出可映射的工作区与 Harness 会话。 */
+export async function fetchSessions() {
+  try {
+    return await request('sessions')
+  } catch (err) {
+    report(err)
+    return null
+  }
+}
+
+/** 在指定工作区新建一个专用会话（映射后会显示在侧边栏）。 */
+export async function createMappedSession(workspaceId) {
+  try {
+    return await request('sessions/create', { workspaceId })
+  } catch (err) {
+    report(err)
+    return null
+  }
+}
+
 /** 把灵感导出到收件箱（~/.dsh/media-desk/inbox），等主会话的 agent 取件写成稿。 */
 export async function exportDraft(id) {
   try {

@@ -71,4 +71,19 @@ export const CORE = {
   '{n} 张': '{n} cards',
   '正在画…': 'Drawing…',
   '等待底图…': 'Waiting for artwork…',
+
+  // 会话映射
+  '助手映射会话': 'Map assistant to a session',
+  '不映射（插件自带助手）': 'No mapping (built-in assistant)',
+  '无目录': 'no folder',
+  '运行中': 'running',
+  '映射后助手由 Harness 会话里的完整 agent 回答（带 skills 和记忆），对话记录同步到侧边栏；不再解析「一句话改灵感」这类指令，模型也由该会话决定。': 'Mapped: a full Harness agent (skills, memory) answers; chat history syncs to the sidebar. One-line "edit my ideas" commands stop working, and the session picks the model.',
+  '新建专用会话': 'New dedicated session',
+  '新建': 'Create',
+  '发布': 'Publish',
+  '发布到小红书': 'Publish to Xiaohongshu',
+  '确认发布': 'Publish now',
+  '将在 ego 浏览器里自动填写标题、正文并上传图片，点击确认后直接发布，不再二次确认。': 'Fills title, body and uploads images in the ego browser, then publishes right away. No second confirmation.',
+  '已发布到小红书': 'Published to Xiaohongshu',
+  '已发布': 'Published',
 }
