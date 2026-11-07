@@ -102,52 +102,6 @@ export async function coverDataUrl(options) {
   return canvas.toDataURL('image/jpeg', 0.9)
 }
 
-/** 小红书图文内页：底图叠图上大字，3:4 竖版。大字在上方三分之一，底图铺满。 */
-export async function composeGalleryCard({ src, text }) {
-  const WIDTH = 1080
-  const HEIGHT = 1440
-  const canvas = document.createElement('canvas')
-  canvas.width = WIDTH
-  canvas.height = HEIGHT
-  const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#f4efe8'
-  ctx.fillRect(0, 0, WIDTH, HEIGHT)
-  if (src) {
-    const image = await loadImage(src)
-    const scale = Math.max(WIDTH / image.width, (HEIGHT * 0.62) / image.height)
-    ctx.drawImage(image, (WIDTH - image.width * scale) / 2, (HEIGHT - image.height * scale) / 2, image.width * scale, image.height * scale)
-    const shade = ctx.createLinearGradient(0, HEIGHT * 0.1, 0, HEIGHT * 0.72)
-    shade.addColorStop(0, 'rgba(0, 0, 0, .5)')
-    shade.addColorStop(1, 'rgba(0, 0, 0, 0)')
-    ctx.fillStyle = shade
-    ctx.fillRect(0, 0, WIDTH, HEIGHT * 0.72)
-  } else {
-    const glow = ctx.createRadialGradient(WIDTH * 0.2, HEIGHT * 0.2, 0, WIDTH * 0.2, HEIGHT * 0.2, WIDTH)
-    glow.addColorStop(0, 'rgba(217, 116, 90, .35)')
-    glow.addColorStop(1, 'rgba(217, 116, 90, 0)')
-    ctx.fillStyle = glow
-    ctx.fillRect(0, 0, WIDTH, HEIGHT)
-  }
-  const units = [...text].reduce((n, ch) => n + (/[\u0000-\u024f]/.test(ch) ? 0.55 : 1), 0)
-  const size = units > 14 ? 96 : 120
-  ctx.font = `700 ${size}px "Songti SC", "STSong", "Noto Serif SC", serif`
-  ctx.fillStyle = '#fff'
-  ctx.textBaseline = 'alphabetic'
-  ctx.shadowColor = 'rgba(0, 0, 0, .4)'
-  ctx.shadowBlur = 20
-  const lines = wrap(ctx, text, WIDTH - 160, 3)
-  const lineHeight = size * 1.26
-  lines.forEach((line, index) => {
-    ctx.fillText(line, 80, 170 + index * lineHeight)
-  })
-  return canvas
-}
-
-export async function galleryCardDataUrl(options) {
-  const canvas = await composeGalleryCard(options)
-  return canvas.toDataURL('image/jpeg', 0.9)
-}
-
 export async function downloadCover(options, name) {
   const url = await coverDataUrl(options)
   const link = document.createElement('a')

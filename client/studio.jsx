@@ -1,7 +1,7 @@
 // 点开灵感后的工作区：左边对话，右边是一张稿面。稿面的格子一开始就排好，同时开工，一点点长满。
 import React from 'react'
 import { ChatPanel } from './chat.jsx'
-import { downloadCover, galleryCardDataUrl } from './cover.js'
+import { downloadCover } from './cover.js'
 import { cancelProduce, closeItem, dispatchOps, exportDraft, regenAsset, revealSaved, runProduce, saveProduced, setDesk, toast, useDesk, watchProduction } from './desk.js'
 import { plural, t } from './i18n.js'
 import { Icon, IconButton } from './ui.jsx'
@@ -314,32 +314,22 @@ function ArticleTile({ item, live, open, onToggle, onView, tileRef }) {
   )
 }
 
-/** 小红书图文内页：底图叠图上大字（浏览器合成，3:4 竖版）。 */
+/** 小红书图文内页：生图直接渲染设计卡（含中文文字），3:4 竖版展示。 */
 function GalleryTile({ production, onView }) {
   const images = production?.images ?? []
-  const key = images.map(i => `${i?.src ?? ''}|${i?.caption ?? ''}`).join('||')
-  const [cards, setCards] = React.useState({})
-  React.useEffect(() => {
-    let alive = true
-    for (const [i, img] of images.entries()) {
-      if (!img?.src) continue
-      galleryCardDataUrl({ src: img.src, text: img.caption ?? '' }).then(url => { if (alive) setCards(c => ({ ...c, [i]: url })) }).catch(() => {})
-    }
-    return () => { alive = false }
-  }, [key])
-  const busy = images.some(i => i?.status === 'running' || (i?.src && cards[images.indexOf(i)] === undefined))
+  const busy = images.some(i => i?.status === 'running')
   return (
     <>
       <header className="md-tile-head">
         <h2>{t('图文卡片')}</h2>
-        {busy ? <span className="md-shimmer">{t('正在合成图上文字…')}</span> : null}
+        {busy ? <span className="md-shimmer">{t('正在画…')}</span> : null}
         <span className="md-grow" />
         <span className="md-tile-meta">{t('{n} 张', { n: images.length })}</span>
       </header>
       <div className="md-gallery">
         {images.map((img, i) => (
           <figure key={i} className="md-gallery-card">
-            {cards[i] ? <img src={cards[i]} alt={img.caption} draggable={false} onClick={() => onView(`image:${i}`)} /> : <div className="md-gallery-loading"><span className="md-shimmer">{img?.status === 'running' ? t('正在画…') : t('等待底图…')}</span></div>}
+            {img?.src ? <img src={img.src} alt={img.caption} draggable={false} onClick={() => onView(`image:${i}`)} /> : <div className="md-gallery-loading"><span className="md-shimmer">{img?.status === 'running' ? t('正在画…') : t('等待底图…')}</span></div>}
             <figcaption>{img.caption}</figcaption>
           </figure>
         ))}
