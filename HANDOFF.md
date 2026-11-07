@@ -47,13 +47,33 @@
 - **修正本会话前面的一个判断**：走 `prompt` 正规 inbox 时，写日志的仍是 agent loop 单写者，不会像 2026-08-23 事故那样 seq 撞车。之前「第二个写者」的顾虑只针对插件绕过 agent 自己 append 日志的假设。
 - 因此该构想比「共用当前 session」干净：会话记录天然同步、侧边栏一等公民、拥有该会话的 skills/工作区指令/模型，且因「可选」可映射到专用会话而不污染主会话上下文。
 
-### 落地草图
-工作台输入框 → `prompt(选中的 sessionId)` → 该会话 agent 回答 → 工作台订阅该会话历史/投影显示回复；工作台不再自己存 chat、不再裸调 llm。
+### 真机验证结论（2026-11-07 20:xx 全部跑通，探针代码已删、测试会话已归档）
+在插件里加临时探针路由，从 GUI 同源 fetch 触发，实测：
 
-### 两处未钉死（决定工作量，不决定方向）
-1. `prompt` 是 @Remote 方法，Host 侧直接调时 `source: MessageSource`（user-rpc）如何注入 —— 需实测。
-2. assistant 回复如何读回工作台（订阅 session 投影/事件，半内部 API）—— 需实测。
-若映射到主会话：工作台对话会混进主会话上下文（身份层/记忆边界见 AGENTS.md），建议默认专用会话；不会并发撞车（inbox 排队）。
+| 环节 | 调用 | 结果 |
+|---|---|---|
+| 拿到服务 | `ctx.get('sessionController')` | 可用（无需 inject） |
+| 列可选会话 | `sc.list({}, signal)` | 145 个会话 ✅ |
+| 建会话 | `sc.create({ cwd })` | `session-31f7780e…`，preset `standard` ✅ |
+| 投消息 | `sc.prompt({ requestId, sessionId, mode:'queue', content:[{type:'text',text}] }, AbortSignal.timeout(30000))` | `{accepted:true}` ✅ |
+| agent 真跑一轮 | （自动） | `inspect()` 读到 21 个事件，`assistant/message` 内容为「探针成功」、`turn/end completed`、自动生成标题「探针测试」 ✅ |
+| 读回历史 | `sc.inspect(sessionId, signal)` | 普通 Promise，返回 `events[]`（从 seq 0），干净 ✅ |
+| 归档清理 | `ctx.get('workspaceController').archiveSession({ sessionId })` | 返回完整归档集合（84 个，含探针），只新增指定一个 ✅ |
+
+**两处顾虑全部解除**：
+1. source 注入 —— `prompt(request, signal)` 这个 Remote 包装方法**自己构造** `{kind:'user', rpcId:requestId}` 再转给 `commands.prompt`，Host 侧直接调无需注入。
+2. 读回回复 —— `inspect()` 即可（普通 Promise）；`follow()` 是长连接 AsyncIterable，`for await` break 会挂住（探针里踩过，evaluate 超时），不适合插件 Host 侧；工作台是 Web UI，也可复用 Client 侧的 Remote 订阅。
+
+**单写者确认**：`prompt` 走 `agent.followup(message)` 正规 inbox，写日志的仍是 agent loop 自己 —— 不会复现 2026-08-23 的 seq 撞车。
+
+### 一处新发现（影响"侧边栏可见"）
+探针用 `create({ cwd: /tmp/... })` 建的会话**没出现在侧边栏** —— 侧边栏是「工作区 → 会话」两级结构，临时 cwd 不归属任何工作区。源码确认 `create` 支持 `workspaceId`（走 `ctx.workspaceRegistry.get`，与 cwd 互斥），**正式实现要 `create({ workspaceId })` 把会话建到用户选的工作区里**，才能像网页快照一样挂在侧边栏。工作区列表从 `workspaceController` 拿。
+
+### 落地草图（已验证可行）
+1. 工作台设置里选一个工作区 → `workspaceController` 列工作区 → `sc.create({ workspaceId })` 建/复用一个专用会话（或 `sc.list()` 让用户选已有会话）
+2. 工作台输入框每句话 → `sc.prompt({ requestId, sessionId, mode:'queue', content:[{type:'text',text}] }, signal)` 投进该会话
+3. 该会话的 agent 用全套 skills/工作区指令/模型回答并写日志；工作台用 `sc.inspect(sessionId)`（或 Client 侧 Remote 订阅）读回 `assistant/message` 显示
+4. 工作台不再自己存 chat、不再裸调 llm；对话记录天然就是那个会话的日志，侧边栏可见可回溯
 
 ## 下次待办（按优先级）
 
