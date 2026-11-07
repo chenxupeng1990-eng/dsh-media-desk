@@ -189,6 +189,8 @@ export async function scanInbox(store) {
       }, { undoable: false })
       await mkdir(doneDir(store.root), { recursive: true })
       await rename(join(inboxDir(store.root), name), join(doneDir(store.root), name))
+      // 对应的任务文件一起归档，避免被重复取件
+      await rename(join(inboxDir(store.root), `任务-${itemId}.md`), join(doneDir(store.root), `任务-${itemId}.md`)).catch(() => {})
     } catch (err) {
       // 单个文件失败不阻塞其他文件；错误留在原位等人工看
       console.error('[media-desk] inbox 回填失败:', name, err.message)
