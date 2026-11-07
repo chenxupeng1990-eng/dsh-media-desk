@@ -228,10 +228,12 @@ export async function scanInbox(store, desk) {
             prod.images.forEach((image, index) => { if (!image.file) targets.push(`image:${index}`) })
           }
           if (parsed.gallery.length) prod.mode = 'gallery'
-        } else if (parsed.gallery.some(row => row.file)) {
+        } else if (parsed.gallery.some(row => row.file) || /^file:(.+)$/.exec(parsed.meta.coverFile ?? '')) {
           // 没接生图也能收 file: 图：直接入库
           const prod = item.production
           prod.images = parsed.gallery
+          const cf = /^file:(.+)$/.exec(parsed.meta.coverFile ?? '')
+          if (cf) prod.cover = { src: `media-desk/files/${cf[1].trim()}`, status: 'done', file: true }
           prod.mode = 'gallery'
         }
         return { receipts, errors: [], state: draft }
