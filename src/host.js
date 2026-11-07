@@ -198,14 +198,18 @@ export async function scanInbox(store, desk) {
         }
         const { receipts } = applyRevision(item.production, revise, { canDraw: false })
         item.production.external = true
-        // 生图接口已接入时，把缺的画布建出来（封面必建；分镜用成稿里的 ## 分镜 段落），交给 Producer 画
+        // 生图接口已接入时，把缺的画布建出来交给 Producer 画；redraw: cover,shots 可强制重画
+        // 封面提示词优先用成稿文件里的 coverPrompt（作者从正文提取的核心画面），没有才退回标题模板
         if (drawReady) {
           const prod = item.production
+          const redraw = String(parsed.meta.redraw ?? '').split(',').map(row => row.trim()).filter(Boolean)
+          const coverPromptText = parsed.meta.coverPrompt ?? tr('为《{title}》画一张封面图，核心信息是「{cover}」', { title: prod.title ?? '', cover: prod.coverText ?? '' })
+          if (redraw.includes('cover') && prod.cover?.status === 'done') prod.cover = null
           if (!prod.cover) {
-            prod.cover = { prompt: tr('为《{title}》画一张封面图，核心信息是「{cover}」', { title: prod.title ?? '', cover: prod.coverText ?? '' }), status: 'idle' }
+            prod.cover = { prompt: coverPromptText, status: 'idle' }
             targets.push('cover')
           }
-          if (parsed.shots.length && !prod.shots?.length) {
+          if (parsed.shots.length && (redraw.includes('shots') || !prod.shots?.length)) {
             prod.shots = parsed.shots.slice(0, 12)
             prod.shots.forEach((_, index) => targets.push(`shot:${index}`))
           }
