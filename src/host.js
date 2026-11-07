@@ -144,8 +144,8 @@ export async function exportDraft(store, body) {
   return { path: file, itemId: item.id }
 }
 
-/** 解析成稿文件的 frontmatter 和正文。 */
-function parseDraft(markdown) {
+/** 解析成稿文件的 frontmatter、正文和可选的分镜段落。 */
+export function parseDraft(markdown) {
   const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(markdown)
   if (!match) return null
   const meta = {}
@@ -153,11 +153,23 @@ function parseDraft(markdown) {
     const pair = /^(\w+):\s*(.*)$/.exec(line.trim())
     if (pair) meta[pair[1]] = pair[2].trim()
   }
-  return { meta, body: match[2].trim() }
+  let body = match[2].trim()
+  const shots = []
+  const shotsAt = body.indexOf('## 分镜')
+  if (shotsAt >= 0) {
+    const shotsText = body.slice(shotsAt + '## 分镜'.length).trim()
+    body = body.slice(0, shotsAt).trim()
+    for (const [index, line] of shotsText.split('\n').map(row => row.trim()).filter(Boolean).entries()) {
+      const [visual, voice = ''] = line.replace(/^\d+[.、]\s*/, '').split('|').map(part => part.trim())
+      if (!visual) continue
+      shots.push({ no: index + 1, shot: '画面', visual, voice, seconds: 5, prompt: visual, status: 'idle' })
+    }
+  }
+  return { meta, body, shots }
 }
 
-/** 扫描 inbox 里的成稿文件，回填到对应灵感并归档。 */
-export async function scanInbox(store) {
+/** 扫描 inbox 里的成稿文件，回填到对应灵感并触发缺图重画。 */
+export async function scanInbox(store, desk) {
   let files = []
   try {
     files = (await readdir(inboxDir(store.root))).filter(name => /^成稿-[\w-]+\.md$/.test(name))
@@ -175,22 +187,37 @@ export async function scanInbox(store) {
         article: parsed.body,
       }
       const label = tr('思悟成稿入库：{title}', { title: String(revise.title || name).slice(0, 20) })
+      const targets = []
+      const drawReady = desk ? imageReady(await desk.settings.read()) : false
       await store.mutate(label, (draft) => {
         const item = draft.items.find(row => row.id === itemId)
         if (!item) throw new Error(tr('灵感 {id} 不存在，成稿文件留在 inbox', { id: itemId }))
         if (item.production?.status === 'running') throw new Error(tr('灵感 {id} 正在成稿，跳过回填', { id: itemId }))
         if (!item.production || item.production.stage === 'brief') {
-          // 还没成过稿：直接建一个纯文本成稿，图留给工作台的生图链路
           item.production = { status: 'done', stage: 'making', title: item.title, article: '', coverText: '', cover: null, images: [], shots: [], startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), external: true }
         }
         const { receipts } = applyRevision(item.production, revise, { canDraw: false })
         item.production.external = true
+        // 生图接口已接入时，把缺的画布建出来（封面必建；分镜用成稿里的 ## 分镜 段落），交给 Producer 画
+        if (drawReady) {
+          const prod = item.production
+          if (!prod.cover) {
+            prod.cover = { prompt: tr('为《{title}》画一张封面图，核心信息是「{cover}」', { title: prod.title ?? '', cover: prod.coverText ?? '' }), status: 'idle' }
+            targets.push('cover')
+          }
+          if (parsed.shots.length && !prod.shots?.length) {
+            prod.shots = parsed.shots.slice(0, 12)
+            prod.shots.forEach((_, index) => targets.push(`shot:${index}`))
+          }
+        }
         return { receipts, errors: [], state: draft }
       }, { undoable: false })
       await mkdir(doneDir(store.root), { recursive: true })
       await rename(join(inboxDir(store.root), name), join(doneDir(store.root), name))
       // 对应的任务文件一起归档，避免被重复取件
       await rename(join(inboxDir(store.root), `任务-${itemId}.md`), join(doneDir(store.root), `任务-${itemId}.md`)).catch(() => {})
+      // 异步画图，不阻塞扫描
+      for (const target of targets) desk?.producer?.regenerate(itemId, target).catch(() => {})
     } catch (err) {
       // 单个文件失败不阻塞其他文件；错误留在原位等人工看
       console.error('[media-desk] inbox 回填失败:', name, err.message)
@@ -610,9 +637,9 @@ export default {
     // 启动时恢复用户在工作台里选过的助手模型
     settings.read().then(saved => setAssistantModel(saved.assistant)).catch(() => {})
     // 成稿文件桥：启动扫一次，之后每 20 秒看一眼 inbox。unref 让定时器不持事件循环，测试进程能正常退出。
-    const inboxTimer = setInterval(() => { scanInbox(store).catch(() => {}) }, 20_000)
+    const inboxTimer = setInterval(() => { scanInbox(store, desk).catch(() => {}) }, 20_000)
     inboxTimer.unref?.()
-    scanInbox(store).catch(() => {})
+    scanInbox(store, desk).catch(() => {})
     ctx.effect(() => ctx.webServer.register({
       kind: 'prefix',
       path: '/media-desk',
