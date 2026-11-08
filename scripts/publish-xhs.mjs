@@ -57,28 +57,22 @@ try {
       return null
     })
     if (!clicked) throw new Error('没找到可用的发布按钮（页面结构可能变了）')
-    await sleep(6000)
-    const after = await page.evaluate(() => ({ url: location.href, text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 300) }))
-    if (/发布成功|发布已完成/.test(after.text) || !/publish\/publish/.test(after.url)) {
-      summary.ok = true
-      summary.url = after.url
-    } else {
-      // 兜底：确认弹窗里再点一次「发布」
-      const again = await page.evaluate(() => {
-        const visible = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 }
-        const btn = [...document.querySelectorAll('button')].find(b => (b.textContent || '').trim() === '发布' && visible(b) && !b.disabled)
-        if (btn) { btn.click(); return true }
-        return false
-      })
-      await sleep(5000)
-      const final = await page.evaluate(() => ({ url: location.href, text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 300) }))
-      if (again && (/发布成功|发布已完成/.test(final.text) || !/publish\/publish/.test(final.url))) {
-        summary.ok = true
-        summary.url = final.url
-      } else {
-        throw new Error('发布后未确认成功：' + final.text.slice(0, 120))
+    // 只点一次发布；轮询 20 秒等平台确认。绝不二次点击——重复发布比发布失败严重。
+    const deadline = Date.now() + 20_000
+    let confirmed = false
+    let pageText = ''
+    while (Date.now() < deadline) {
+      await sleep(2000)
+      const after = await page.evaluate(() => ({ url: location.href, text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 400) }))
+      pageText = after.text
+      if (/发布成功|发布已完成|笔记已发布/.test(after.text) || (!/publish\/publish/.test(after.url) && !/creator\.xiaohongshu\.com\/publish/.test(after.url))) {
+        confirmed = true
+        summary.url = after.url
+        break
       }
+      if (/发布失败|内容包含|请修改|审核不通过/.test(after.text)) break
     }
+    if (!confirmed) throw new Error('发布已点击但未收到平台确认，请到「笔记管理」核对是否已发出（避免重复，不要直接重发）：' + pageText.slice(0, 150))
   }
 } catch (err) {
   summary.error = String(err.message || err).slice(0, 300)
