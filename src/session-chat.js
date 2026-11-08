@@ -2,9 +2,30 @@
 import { randomUUID } from 'node:crypto'
 import { tr } from './i18n.js'
 
+/**
+ * 执行映射会话里的斜杠命令。命中返回结果文本；未命中返回 undefined（调用方继续按普通消息投递）。
+ * 命令直接作用于该会话的 Agent，不发给模型；command/run、command/done 生命周期写入会话日志，侧边栏可见。
+ */
+export async function executeSessionCommand(ctx, sessionId, line) {
+  const commands = ctx.get('commands')
+  if (!commands?.execute) return undefined
+  const resolved = await ctx.get('sessionController').resolveAgent(sessionId)
+  if (!resolved || resolved.error) throw new Error(resolved?.error?.message ?? tr('会话 Agent 无法唤醒'))
+  const execution = await commands.execute(resolved.agent, line, [], AbortSignal.timeout(60000))
+  if (!execution) return undefined
+  const result = execution.result
+  if (result?.kind === 'error') throw new Error(result.text)
+  return result?.text?.trim() || tr('命令已执行。')
+}
+
 export async function sessionReply(ctx, sessionId, text, { timeoutMs = 120_000 } = {}) {
   const sc = ctx.get('sessionController')
   if (!sc) throw new Error(tr('会话服务不可用'))
+  // 斜杠命令：命中注册表就交给命令运行时直接执行（不发给模型），未命中按普通消息投递
+  if (text.startsWith('/')) {
+    const executed = await executeSlash(ctx, sessionId, text)
+    if (executed !== undefined) return executed
+  }
   const requestId = `media-desk-${randomUUID()}`
   return new Promise((resolve, reject) => {
     let currentTurn = null
