@@ -1,11 +1,12 @@
-// 小红书发布脚本：由 media-desk host 拉起（stdin 不可用，任务从 MEDIA_DESK_PUBLISH_TASK JSON 文件读）。
-// 用法：ego-browser nodejs scripts/publish-xhs.mjs（环境变量 MEDIA_DESK_PUBLISH_TASK 指向任务 JSON）
+// 小红书发布脚本：由 media-desk host 通过 stdin 注入任务后拉起。
+// 独立调试也支持 MEDIA_DESK_PUBLISH_TASK 文件路径；ego-browser Node 运行时不依赖 shell 环境变量。
 // 任务：{ title, article, images: [绝对路径] }
 // 结果：最后一行输出 PUBLISH_RESULT {json}。发布是账号行为：填完直接点发布（按钮点击即授权），失败如实报告不重试。
 const fs = await import('node:fs/promises')
 
-const taskPath = process.env.MEDIA_DESK_PUBLISH_TASK
-const task = JSON.parse(await fs.readFile(taskPath, 'utf8'))
+const taskInput = globalThis.__MEDIA_DESK_PUBLISH_TASK ?? process.env.MEDIA_DESK_PUBLISH_TASK
+const task = typeof taskInput === 'string' ? JSON.parse(await fs.readFile(taskInput, 'utf8')) : taskInput
+if (!task || typeof task !== 'object') throw new Error('发布任务缺失')
 const summary = { ok: false }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
@@ -21,18 +22,20 @@ try {
     if (loginWall) throw new Error('小红书登录失效，需要在 ego 浏览器里重新登录')
 
     // 上传图片（必须先传，发布页选「上传图文」后才有标题/正文输入框）
-    const input = await page.waitForSelector("input[type='file']", { timeout: 15000 })
-    await input.setInputFiles(task.images)
+    await page.waitForSelector("input[type='file']", { timeout: 15000 })
+    await page.setInputFiles("input[type='file']", task.images)
     await sleep(8000)
     // 等待上传完成：至少一张缩略图出现
     await page.waitForFunction(() => document.querySelectorAll('img[src*="sns-img"], img[src*="xhscdn"]').length > 0, { timeout: 120_000 }).catch(() => {})
     await sleep(3000)
 
     // 标题（限 20 字）与正文（限 1000 字）
-    const titleInput = await page.waitForSelector("input[placeholder*='标题'], input[name='title']", { timeout: 20000 })
-    await titleInput.fill(task.title.slice(0, 20))
-    const editor = await page.waitForSelector(".ql-editor[contenteditable='true'], div[contenteditable='true'][data-placeholder]", { timeout: 15000 })
-    await editor.click()
+    const titleSelector = "input[placeholder*='标题'], input[name='title']"
+    await page.waitForSelector(titleSelector, { timeout: 20000 })
+    await page.fill(titleSelector, task.title.slice(0, 20))
+    const editorSelector = ".ql-editor[contenteditable='true'], div[contenteditable='true'][data-placeholder]"
+    await page.waitForSelector(editorSelector, { timeout: 15000 })
+    await page.click(editorSelector)
     await page.keyboard.type(task.article.slice(0, 1000), { delay: 5 })
     await sleep(1500)
 

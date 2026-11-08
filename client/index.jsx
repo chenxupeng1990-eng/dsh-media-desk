@@ -9,6 +9,7 @@ import { StyleView } from './style.jsx'
 import { ScheduleView } from './schedule.jsx'
 import { ModelButton, ModelPicker } from './modelpick.jsx'
 import { SettingsDialog } from './settings.jsx'
+import { SessionPicker } from './sessionpick.jsx'
 import { Studio } from './studio.jsx'
 import css from './styles.css'
 import { lang, subscribeLang, t, useLang } from './i18n.js'
@@ -180,6 +181,7 @@ function Desk() {
       <FormDialog />
       {ready ? <SettingsDialog /> : null}
       {ready ? <ModelPicker /> : null}
+      {ready ? <SessionPicker /> : null}
       <Toast />
     </div>
   )

@@ -3,10 +3,13 @@ import React from 'react'
 import { fetchModels, saveAssistant, setDesk, useDesk } from './desk.js'
 import { t } from './i18n.js'
 import { Dialog, Icon } from './ui.jsx'
+import { SessionButton } from './sessionpick.jsx'
 
 export function ModelButton() {
   const model = useDesk(s => s.model)
   const override = useDesk(s => s.settings?.assistant?.model)
+  const mapped = useDesk(s => s.settings?.assistantSession)
+  if (mapped) return <SessionButton />
   return (
     <button type="button" className="md-open-dock" title={t('助手模型')} onClick={() => setDesk({ modelPickOpen: true })}>
       <Icon name="spark" size={13} />{override || model || t('助手模型')}

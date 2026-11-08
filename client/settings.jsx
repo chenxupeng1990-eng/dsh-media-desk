@@ -1,6 +1,7 @@
 // 设置：开放接入的生图模型和保存位置。
 import React from 'react'
-import { createMappedSession, fetchSessions, saveSettings, setDesk, testImage, useDesk } from './desk.js'
+import { saveSettings, setDesk, testImage, useDesk } from './desk.js'
+import { SessionButton } from './sessionpick.jsx'
 import { t, useLang } from './i18n.js'
 import { Dialog, Icon } from './ui.jsx'
 
@@ -21,13 +22,6 @@ const LANGUAGES = [
   { value: 'en', label: () => 'English' },
 ]
 
-function sessionLabel(row) {
-  const dir = (row.cwd || '').split('/').filter(Boolean).pop() || t('无目录')
-  const short = String(row.sessionId).replace(/^session-/, '').slice(0, 8)
-  const when = row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : ''
-  return `${dir} · ${short}${when ? ' · ' + when : ''}${row.running ? ' · ' + t('运行中') : ''}`
-}
-
 export function SettingsDialog() {
   useLang()
   const open = useDesk(s => s.settingsOpen)
@@ -36,17 +30,12 @@ export function SettingsDialog() {
   const [testing, setTesting] = React.useState(false)
   const [sample, setSample] = React.useState(null)
   const [advanced, setAdvanced] = React.useState(false)
-  const [sessionData, setSessionData] = React.useState(null)
-  const [newWorkspace, setNewWorkspace] = React.useState('')
+  const mappedSession = useDesk(s => s.mappedSession)
   React.useEffect(() => {
     if (!open || !settings) return
     const { image } = settings
-    setForm({ language: settings.language ?? 'auto', baseUrl: image.baseUrl, model: image.model, apiKey: '', size: image.size, quality: image.quality, extra: image.extra, exportDir: settings.exportDir ?? '', imageCount: settings.imageCount, shotCount: settings.shotCount, mapped: settings.assistantSession ?? '' })
+    setForm({ language: settings.language ?? 'auto', baseUrl: image.baseUrl, model: image.model, apiKey: '', size: image.size, quality: image.quality, extra: image.extra, exportDir: settings.exportDir ?? '', imageCount: settings.imageCount, shotCount: settings.shotCount })
     setSample(null)
-    fetchSessions().then(data => {
-      setSessionData(data)
-      if (data?.workspaces?.length) setNewWorkspace(data.workspaces[0].id)
-    })
   }, [open, settings])
   if (!open || !form) return null
   const close = () => setDesk({ settingsOpen: false })
@@ -54,7 +43,7 @@ export function SettingsDialog() {
   const payload = () => ({
     language: form.language,
     image: { baseUrl: form.baseUrl, model: form.model, apiKey: form.apiKey, size: form.size, quality: form.quality, extra: form.extra },
-    exportDir: form.exportDir, imageCount: Number(form.imageCount), shotCount: Number(form.shotCount), assistantSession: form.mapped,
+    exportDir: form.exportDir, imageCount: Number(form.imageCount), shotCount: Number(form.shotCount),
   })
   const activePreset = PRESETS.find(p => p.baseUrl && p.baseUrl === form.baseUrl)?.id ?? (form.baseUrl ? 'custom' : null)
   return (
@@ -72,27 +61,10 @@ export function SettingsDialog() {
           </div>
         </div>
         <div className="md-field">
-          <span>{t('助手映射会话')}</span>
-          <select aria-label={t('助手映射会话')} value={form.mapped} onChange={e => set('mapped', e.target.value)}>
-            <option value="">{t('不映射（插件自带助手）')}</option>
-            {(sessionData?.sessions ?? []).map(row => <option key={row.sessionId} value={row.sessionId}>{sessionLabel(row)}</option>)}
-          </select>
-          <small>{t('映射后助手由 Harness 会话里的完整 agent 回答（带 skills 和记忆），对话记录同步到侧边栏；不再解析「一句话改灵感」这类指令，模型也由该会话决定。')}</small>
-          <div className="md-field-row" style={{ marginTop: 8 }}>
-            <label className="md-field" style={{ flex: 1 }}>
-              <span>{t('新建专用会话')}</span>
-              <select value={newWorkspace} onChange={e => setNewWorkspace(e.target.value)}>
-                {(sessionData?.workspaces ?? []).map(w => <option key={w.id} value={w.id}>{w.title || w.path || w.id}</option>)}
-              </select>
-            </label>
-            <button type="button" className="md-btn" style={{ alignSelf: 'flex-end' }} onClick={async () => {
-              const created = await createMappedSession(newWorkspace)
-              if (created?.sessionId) {
-                set('mapped', created.sessionId)
-                setSessionData(await fetchSessions())
-              }
-            }}>{t('新建')}</button>
-          </div>
+          <span>{t('当前会话')}</span>
+          <strong>{settings?.assistantSession ? mappedSession?.title || t('未命名会话') : t('插件自带助手')}</strong>
+          <div><SessionButton /></div>
+          <small>{t('由所选会话的 Agent 回答，并通过工作台工具管理灵感、排期和复盘。模型、模式和上下文跟随所选会话。')}</small>
         </div>
         <label className="md-field">
           <span>{t('成稿保存到')}</span>

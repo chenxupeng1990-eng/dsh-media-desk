@@ -9,6 +9,7 @@ let snapshot = {
   state: null, model: null, modelOk: null, modelError: null, canUndo: false, error: null,
   view: 'home', mode: 'scatter', focusId: null, sheetOrigin: null, dockOpen: true, studioDock: false, chatQuote: null, query: '', kindFilter: 'all', related: null,
   live: {}, settings: null, settingsOpen: false, modelPickOpen: false, thinking: false, toast: null, capture: null, dialog: null,
+  sessionPickOpen: false, sessionSwitchBusy: false, mappedChat: [], mappedSession: null, mappedChatError: null,
 }
 const listeners = new Set()
 
@@ -57,6 +58,7 @@ export async function loadDesk() {
     setLanguagePreference(settings.language)
     const data = await request('state')
     setDesk({ settings, state: data.state, model: data.model, modelOk: data.modelOk, modelError: data.modelError, canUndo: data.canUndo, error: null })
+    if (settings.assistantSession) await refreshMappedChat(settings.assistantSession)
   } catch (err) {
     setDesk({ error: err.message })
   }
@@ -205,16 +207,35 @@ export async function sendChat(text) {
   setDesk(s => ({
     thinking: true,
     chatQuote: null,
-    state: { ...s.state, chat: [...s.state.chat, { id: `tmp_${Date.now()}`, role: 'user', text: message, itemId: focusId ?? undefined }] },
+    ...(s.settings?.assistantSession
+      ? { mappedChat: [...s.mappedChat, { id: `tmp_${Date.now()}`, role: 'user', text: message }] }
+      : { state: { ...s.state, chat: [...s.state.chat, { id: `tmp_${Date.now()}`, role: 'user', text: message, itemId: focusId ?? undefined }] } }),
   }))
+  // Agent 的工具可能在最终回复前改动数据；等待期间刷新业务视图，保留本地对话占位。
+  let syncing = true
+  let refreshPending = false
+  const refreshTimer = snapshot.settings?.assistantSession ? setInterval(async () => {
+    if (refreshPending) return
+    refreshPending = true
+    try {
+      const data = await request('state')
+      if (syncing) setDesk(s => ({ state: { ...data.state, chat: s.state.chat }, canUndo: data.canUndo }))
+    } catch { /* 最终请求统一显示失败，短暂刷新失败留待下一次 */ }
+    finally { refreshPending = false }
+  }, 1200) : null
   try {
     const data = await request('chat', { message, focusId: focusId ?? undefined })
+    syncing = false
     setDesk({ state: data.state, canUndo: true, modelOk: data.modelOk, modelError: data.modelError })
+    if (snapshot.settings?.assistantSession) await refreshMappedChat(snapshot.settings.assistantSession)
     runActions(data.actions || [])
   } catch (err) {
+    syncing = false
     report(err)
     await loadDesk()
   } finally {
+    syncing = false
+    clearInterval(refreshTimer)
     setDesk({ thinking: false })
   }
 }
@@ -373,6 +394,39 @@ export async function fetchSessions() {
   } catch (err) {
     report(err)
     return null
+  }
+}
+
+/** 按所选会话读历史，迟到的旧会话请求不能覆盖新会话。 */
+export async function refreshMappedChat(sessionId = snapshot.settings?.assistantSession) {
+  if (!sessionId) return null
+  try {
+    const data = await request(`session-chat?sessionId=${encodeURIComponent(sessionId)}`)
+    if (snapshot.settings?.assistantSession !== sessionId) return null
+    const pending = snapshot.thinking ? snapshot.mappedChat.filter(message => message.id.startsWith('tmp_') && !data.messages.some(row => row.role === 'user' && row.text === message.text)) : []
+    setDesk({ mappedChat: [...data.messages, ...pending], mappedSession: data, mappedChatError: null })
+    return data
+  } catch (err) {
+    if (snapshot.settings?.assistantSession === sessionId) setDesk({ mappedChatError: err.message })
+    return null
+  }
+}
+
+/** 选择即生效：历史成功读取后才保存映射，不混入上一会话的对话。 */
+export async function selectMappedSession(sessionId) {
+  if (snapshot.thinking || snapshot.sessionSwitchBusy) return false
+  setDesk({ sessionSwitchBusy: true })
+  try {
+    const chat = sessionId ? await request(`session-chat?sessionId=${encodeURIComponent(sessionId)}`) : null
+    const settings = await request('settings', { assistantSession: sessionId })
+    setDesk({ settings, mappedChat: chat?.messages ?? [], mappedSession: chat, mappedChatError: null, chatQuote: null })
+    toast(t('会话已切换'))
+    return true
+  } catch (err) {
+    report(err)
+    return false
+  } finally {
+    setDesk({ sessionSwitchBusy: false })
   }
 }
 

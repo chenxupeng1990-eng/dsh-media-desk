@@ -1,111 +1,181 @@
-# HANDOFF — dsh-media-desk 思悟改版 · 2026-11-07
+# HANDOFF — dsh-media-desk · 2026-11-08 00:26 +08:00
 
-> 交接给下一次会话的自己（或爸爸查看）。当前分支 `siwu-local`（基于上游 main v2.6.1 + 本地私货），fork 备份在 chenxupeng1990-eng/dsh-media-desk。
+> Owner 本次决定：先写交接，下一次再开发。此次只整理文档，不继续改功能、不发布笔记、不提交或推送代码。
+> 工作目录：`/Users/allbychen/Documents/思悟工作区/projects/dsh-media-desk`。
 
-## 一句话现状
+## 1. 接手先读：当前可用状态
 
-自媒体工作台已完成五轮改造并全部实测：模型自选、免费数据抓取、思悟风格卡、文件桥（主会话写稿自动回填）、guizang 设计卡图文模式、一键发布按钮（**未真发验证**）。
+**工作台助手保留在工作台内，映射到用户选择的真实 Harness 会话；Agent 通过工作台工具读写数据，用户可以直接看到界面变化。** 这是 Owner 明确确认的设计。不要再提出“拆掉映射”“去掉输入框”或“只能去主会话操作”。
 
-## 分支与安装状态
+已实现并验证：
 
-- `siwu-local` = 上游 main（v2.6.1）+ PR #5 内容 + 私货，**当前安装且生效**
-- 上游 PR #5（助手模型自选 + 创作中心数据抓取）：https://github.com/woniuniuniu/dsh-media-desk/pull/5 ，等作者 review
-- 本地安装方式：plugin_manager 装的是**本地目录链接**（projects/dsh-media-desk），改代码后需 `node scripts/build.mjs` + set_plugin 关/开来重载
-- ⚠️ 别在插件管理里点升级（会覆盖回 npm 版）；升上游前先移植私货
+- 选择已有会话，或在指定工作区新建并使用会话；消息由该会话的真实 Agent 处理，使用该会话所属模式、工作区上下文、模型和可用工具。
+- 灵感、标题、排期、风格与规则等基础写操作通过 Tool 调用现成的 `applyOps`；复盘可直接查询。
+- 工作台内显示所选会话的近期聊天；侧边栏里的同一会话可继续对话，不维护另一套独立 Agent 身份。
+- 助手顶部及工作台顶栏有 **「切换会话」**。按真实标题搜索，点击立即生效，不用另点保存。
+- 切换时会话名称和聊天记录一起变化；已真机验证两个已有会话来回切换、刷新后选择保留。
+- 映射请求等自身轮次真正结束后返回最终回复，不把“我来处理”当完成；失败不再退回本地规则重复执行。
 
-## 五个功能模块（全部已提交 siwu-local）
+**验证边界：最近一次完整测试为 77 个通过，客户端构建成功，插件已重载生效。发布功能只验证过按钮出现，没有完成真实发布验收。** 本次整理交接未重新跑测试。
 
-1. **助手模型自选**：顶栏按钮，选完存 `~/.dsh/media-desk/settings.json` 的 assistant 字段；`ai.js` modelInfo 优先读覆盖
-2. **数据抓取**：`scripts/scrape-creator-centers.mjs`（ego-browser），小红书逐笔记累计转增量 / B站昨日 / 抖音昨日；去重缓存 `~/.dsh/media-desk/scrape-cache.json`；定时任务每天 13:30
-3. **思悟风格卡**：`src/style-presets.js` 里 `preset_siwu`（私货，不进上游），PRESET_VERSION=2
-4. **文件桥**（核心）：灵感「交给我写」→ host 写 `~/.dsh/media-desk/inbox/任务-<id>.md` → 主会话 agent（定时任务 schedule-bfafdcb7，2 小时轮询）取件写稿 → 成稿文件回填 → 20 秒自动入库 → 任务和成稿归档到 inbox/done/
-   - 协议：frontmatter（itemId/mode/coverText/coverPrompt/coverFile/redraw）+ 正文 + `## 图文`（file: 引用或生图提示词）+ `## 分镜`
-   - `redraw: cover,gallery,shots` 强制重画；`file:` 前缀引用已生成 PNG 不触发生图；没接生图也能收 file: 图
-5. **一键发布**：成稿卡「发布」按钮 → 确认框 → host spawn ego-browser 跑 `scripts/publish-xhs.mjs`（自动传图/填标题 20 字截断/正文 1000 字截断/点发布）→ 成功标 published+时间戳。防重入、已发布拦截、图片预检、6 分钟超时
+## 2. 分支、工作树与安装方式
 
-## 生图与视觉规范（爸爸定的纪律，别回退）
+- 当前分支：`siwu-local`，基于上游 v2.6.1 的本地改版。
+- 本次检查到的最新提交：`5d5feab`（旧版会话映射实现）。**今晚的 Tool 接口、轮次等待修复、按标题切换与真实历史展示，都还在工作树中，尚未提交、尚未推送。** 不要误以为 fork 已备份这些新改动。
+- 已存在的上游 PR：[woniuniuniu/dsh-media-desk#5](https://github.com/woniuniuniu/dsh-media-desk/pull/5)，原范围为模型自选和创作中心数据抓取。本轮未更新 PR，也未查询其最新审阅状态。
+- 当前 profile 通过本地目录链接安装本项目，插件 entry id 为 `include:media-desk`；Web GUI 为 `http://127.0.0.1:3080`。
+- 接手先检查 `git status` 和 diff。保留未提交及未跟踪文件，不执行清理工作树、强制回退或直接覆盖。
+- 客户端改动需先构建，再通过插件管理器重载并刷新现有 GUI。不要另开服务器来代替验证，也不要在插件管理器直接升级到 npm 版覆盖本地功能。
 
-- **生图提示词意图式**：只写用途/受众/感觉/必须出现的内容/要画的中文文字（逐字）/硬规格（竖版）。**禁止**构图、光线、字体、景别等 micro-spec——模型比我们知道怎么生图
-- 镜头字段（焦平面/证据载体）只用于商品实拍类；时讯/观点/工具类一律意图式
-- 中文文字可直画（image 2.6 可信，实测 11 字零错字）；canvas 叠字方案已废弃（死代码已删）
-- 图文卡片用 guizang-social-card-skill（~/.agents/skills/，HTML 渲染 1080×1440，Swiss=测评/数据，Editorial=叙事）；数量不限制，每张唯一 job+new_information
-- 封面默认生图意图式；设计卡封面用 frontmatter `coverFile: file:xxx.png` + `redraw: cover`
-- 生图接口 = magpie 本地 API（127.0.0.1:3425，模型 codex/gpt-image-2.5，**必须带 codex/ 前缀**），magpie 要在运行
+### 尚未提交的文件
 
-## 定时任务（schedule 看板）
+已修改：
 
-- `schedule-c242ad0e`：每天 13:30 创作中心数据抓取（**在跑**）
-- ~~`schedule-bfafdcb7`：每 2 小时收件箱取件写稿~~ → **2026-11-07 爸爸要求关掉，已删除**。取件改为手动：爸爸说「取收件箱」时按上面「生图与视觉规范 + 成稿协议」现场取件；要恢复定时就重建一个（规范全文可从本文件 + git 历史里 schedule prompt 找回）
+- [HANDOFF.md](./HANDOFF.md)
+- [client/chat.jsx](./client/chat.jsx)、[client/desk.js](./client/desk.js)
+- [client/index.jsx](./client/index.jsx)、[client/settings.jsx](./client/settings.jsx)、[client/modelpick.jsx](./client/modelpick.jsx)
+- [client/en/core.js](./client/en/core.js)、[client/styles.css](./client/styles.css)
+- [src/host.js](./src/host.js)、[src/en.js](./src/en.js)
 
-## 已实现功能：工作台助手映射到可选会话（爸爸 2026-11-07 提出，当晚开发并实测通过）
+新增且未跟踪，后续提交时务必包含：
 
-爸爸的精准表达：工作台里的助手「像网页快照一样映射到侧边栏的会话」，**可以选择一个会话做映射**，于是那段对话在 the agent harness 里就是一条正常会话、可见可回溯。
+- [src/tools.js](./src/tools.js)
+- [src/session-chat.js](./src/session-chat.js)
+- [src/session-history.js](./src/session-history.js)
+- [client/sessionpick.jsx](./client/sessionpick.jsx)
+- [test/tools.test.js](./test/tools.test.js)
+- [test/session-chat.test.js](./test/session-chat.test.js)
+- [test/session-history.test.js](./test/session-history.test.js)
 
-### 查证结论（已读 dsh 类型定义，未实测代码）
-- 正式入口存在：`ctx.sessionController.prompt({ requestId, sessionId, mode, content }, signal)`（dsh-api-session-controller），把一条用户消息投进**指定会话**的 Agent inbox，由该会话的 agent loop 跑完整一轮并写日志。
-- `sessionController.list()` 可列出可选会话，`create()` 可新建专用会话 —— 正好对应「选择一个会话做映射」。
-- **修正本会话前面的一个判断**：走 `prompt` 正规 inbox 时，写日志的仍是 agent loop 单写者，不会像 2026-08-23 事故那样 seq 撞车。之前「第二个写者」的顾虑只针对插件绕过 agent 自己 append 日志的假设。
-- 因此该构想比「共用当前 session」干净：会话记录天然同步、侧边栏一等公民、拥有该会话的 skills/工作区指令/模型，且因「可选」可映射到专用会话而不污染主会话上下文。
+过程证据目录也未跟踪；不要用无差别暂存把截图混进代码提交。
 
-### 技术验证（探针阶段，代码已删、测试会话已归档）
-在插件里加临时探针路由，从 GUI 同源 fetch 触发，实测：
+## 3. 当前会话映射怎样工作
 
-| 环节 | 调用 | 结果 |
-|---|---|---|
-| 拿到服务 | `ctx.get('sessionController')` | 可用（无需 inject） |
-| 列可选会话 | `sc.list({}, signal)` | 145 个会话 ✅ |
-| 建会话 | `sc.create({ cwd })` | `session-31f7780e…`，preset `standard` ✅ |
-| 投消息 | `sc.prompt({ requestId, sessionId, mode:'queue', content:[{type:'text',text}] }, AbortSignal.timeout(30000))` | `{accepted:true}` ✅ |
-| agent 真跑一轮 | （自动） | `inspect()` 读到 21 个事件，`assistant/message` 内容为「探针成功」、`turn/end completed`、自动生成标题「探针测试」 ✅ |
-| 读回历史 | `sc.inspect(sessionId, signal)` | 普通 Promise，返回 `events[]`（从 seq 0），干净 ✅ |
-| 归档清理 | `ctx.get('workspaceController').archiveSession({ sessionId })` | 返回完整归档集合（84 个，含探针），只新增指定一个 ✅ |
+### 投递与完成判定
 
-**两处顾虑全部解除**：
-1. source 注入 —— `prompt(request, signal)` 这个 Remote 包装方法**自己构造** `{kind:'user', rpcId:requestId}` 再转给 `commands.prompt`，Host 侧直接调无需注入。
-2. 读回回复 —— `inspect()` 即可（普通 Promise）；`follow()` 是长连接 AsyncIterable，`for await` break 会挂住（探针里踩过，evaluate 超时），不适合插件 Host 侧；工作台是 Web UI，也可复用 Client 侧的 Remote 订阅。
+[Host 路由](./src/host.js) 接收工作台消息，带工作台快照和当前 `focusId`，调用 [session-chat.js](./src/session-chat.js)：
 
-**单写者确认**：`prompt` 走 `agent.followup(message)` 正规 inbox，写日志的仍是 agent loop 自己 —— 不会复现 2026-08-23 的 seq 撞车。
+1. 先订阅 `session/event`。
+2. 用 `sessionController.prompt` 投递到选中会话，`mode: queue`，requestId 以 `media-desk-` 开头。
+3. 根据该 requestId 对应的用户消息定位轮次。
+4. 忽略其他会话、前一轮回复，以及工具执行前的中途说明；等对应 `turn/end` 后返回最终文本。
+5. 2 分钟等待超时只提示去所选会话看进度。**超时不等于 Agent 已停止，不能自动重发或执行本地规则。**
 
-### 一处新发现（影响"侧边栏可见"）
-探针用 `create({ cwd: /tmp/... })` 建的会话**没出现在侧边栏** —— 侧边栏是「工作区 → 会话」两级结构，临时 cwd 不归属任何工作区。源码确认 `create` 支持 `workspaceId`（走 `ctx.workspaceRegistry.get`，与 cwd 互斥），**正式实现要 `create({ workspaceId })` 把会话建到用户选的工作区里**，才能像网页快照一样挂在侧边栏。工作区列表从 `workspaceController` 拿。
+消息和日志写入由原 Agent loop 负责，插件不直接追加会话日志。此前“映射会造成第二写者、撞 seq”的顾虑已被正规 inbox 路径的真机验证推翻。
 
-### 实现（已落地）
-1. 工作台设置里选一个工作区 → `workspaceController` 列工作区 → `sc.create({ workspaceId })` 建/复用一个专用会话（或 `sc.list()` 让用户选已有会话）
-2. 工作台输入框每句话 → `sc.prompt({ requestId, sessionId, mode:'queue', content:[{type:'text',text}] }, signal)` 投进该会话
-3. 该会话的 agent 用全套 skills/工作区指令/模型回答并写日志；工作台用 `sc.inspect(sessionId)`（或 Client 侧 Remote 订阅）读回 `assistant/message` 显示
-4. 工作台不再自己存 chat、不再裸调 llm；对话记录天然就是那个会话的日志，侧边栏可见可回溯
+### 历史与切换
 
-**代码位置**：`src/settings.js`（`assistantSession` 字段）、`src/host.js`（`sessionReply()` + `chatTurn` 映射分支 + `GET sessions` / `POST sessions/create`）、`client/desk.js`（`fetchSessions` / `createMappedSession`）、`client/settings.jsx`（映射下拉 + 新建专用会话）。
-**真机实测**：设置里选「小红书工具开发」工作区 → 新建专用会话 `session-746853ea…` → 保存 → 工作台发一句话 → 回复 `engine:'session'`（完整 agent 的 3 个标题方向，非 80 字 JSON）；侧边栏出现该会话「AI自媒体工作台小红书标题拟定」，点开对话全文可回溯，自动生成标题、模型 Gemini 3.8 Flash、用时 30 秒。验收截图在 `_work/keep/session-map-*.png`。
+[session-history.js](./src/session-history.js)：
 
-**取舍（要跟爸爸确认是否接受）**：
-- 映射后**不再解析 ops** —— 真实 agent 没有工具改插件私有 store，「一句话改灵感/排期」失效；改数据请用工作台按钮（或切回「不映射」恢复原助手全功能）
-- 映射后模型由**该会话自己**决定，工作台顶栏的「助手模型」按钮不生效
-- 工作台仍镜像一份 chat 到 `state.chat` 供 UI 显示，真源是会话日志；「清空对话」只清镜像，不动会话日志
-- 每条消息带上工作台数据快照（当前约 1.6K 字符）让 agent 能回答排期/数据类问题；数据涨到 80 条 items 时可考虑改摘要
-- 会话失败/2 分钟超时自动降级回本地规则并给出 notice，不会卡死
+- 从 `sessionController.list()` 的标题投影读取名称，附工作区；不再截断到前 80 项。
+- 排除子代理及已归档会话；如果当前选择已归档，保留其条目并标明状态。
+- 用 `projections()` 获得读取水位，再通过 `page()` 读取最近 60 条消息范围的记录；只展示用户/助手文本，过滤运行时注入、推理及工具内部输出。
+- 工作台发出的旧包装消息只展示用户原话，不把整个快照显示成聊天气泡。
 
-**当前状态**：映射已开启（指向「小红书工具开发」工作区的专用会话）。切回：设置 → 助手映射会话 → 「不映射（插件自带助手）」→ 保存。
+[sessionpick.jsx](./client/sessionpick.jsx) 提供选择器；[desk.js](./client/desk.js) 在读取目标历史成功后保存映射。迟到的旧会话请求不得覆盖新会话。
 
-## 下次待办（按优先级）
+[chat.jsx](./client/chat.jsx) 映射时使用真实会话历史，每 3 秒刷新近期记录。工具执行期间另每 1.2 秒刷新业务状态，最终回复后停止该业务刷新。映射模式下不显示旧插件模型标签；顶栏改为「切换会话」。
 
-1. **第一次真发验证**：工作台点《PR 滚动病》的「发布」→ 确认。可能暴露发布页 DOM 变化/登录失效——失败报错不会误发，修解析再试。验证点：图片顺序、标题截断、发布成功判定（PUBLISH_RESULT ok:true）
-2. **PR #5 扩充决策**：文件桥/发布功能要不要并进上游 PR（爸爸没拍板）；guizang 是本地 skill 依赖，上游用户需自配
-3. **「抓我的账号」**（风格页）仍走 Monid 付费——可换成浏览器方案（同数据抓取模式），爸爸提过没拍板
-4. **空任务** `任务-it_mw5ql8f12l1.md`（标题只有「做一个」）等爸爸补内容
-5. 上游 v2.6.1 有 related.js 等新功能，本地 siwu-local 已基于它，无冲突
+**不能把历史测试用的 `session-746853ea…` 写死为当前映射。Owner 随时可切换，运行时应读取设置里的 `assistantSession`。**
 
-## 已知的坑（详见 ~/.dsh/LESSONS.md）
+### 从哪里提问：Owner 刚确认的使用理解
 
-- Homebrew pnpm ENOEXEC 已修（node install.js 装原生二进制）
-- **ego 标签用完必须 page.close()**——遗留 3080 标签占满 Chromium 同主机连接池，DSH web 整体卡死
-- DSH 桌面端运行期间别在 profile 目录跑 pnpm
-- web_search 插件欠费（DeepSeek 402）——查新闻用 ego 开 x.com 带登录态搜
-- 生图接口依赖 magpie 进程存活；magpie 没开时报"连不上生图服务"
+- 工作台入口会附时间、工作台数据、`focusId` 和说明，Agent 能从消息内容判断来自工作台，减少重复交代背景。
+- 当前没有独立的可见“来源标签”；底层仍是用户消息，requestId 前缀可用于定位工作台请求。
+- 打开具体笔记后，消息带该对象的上下文，可以说“改这篇标题”“这条排到明晚”；`focusId: null` 表示未选定单篇。
+- 两个入口连接的是同一个所选会话。新建或换到其他会话不会自动继承上一会话全部聊天历史；工作台快照也不等于整个页面画面或完整记忆。
+- skills 可用不等于已读完；Agent 仍应按任务加载相关技能。
 
-## 验证方法
+## 4. 工作台工具层
 
-- 单测：`node --test test/*.test.js`（68 个，~300ms；若变慢查有没有人往 apply 里加未 unref 的定时器）
-- 构建：`node scripts/build.mjs`（client → dist/client.js，git 忽略 dist）
-- 插件重载：plugin_manager set_plugin include:media-desk false→true
-- 真机验证：ego-browser nodejs 开 3080 → 点 Media Desk → 操作 → 截图；fetch 接口用 GUI 标签页同源（带会话）
+[tools.js](./src/tools.js) 注册三个工具，映射会话和主会话都可用：
+
+| 工具 | 已覆盖能力 |
+|---|---|
+| `media_desk_state` | 读取真实条目 id、标题、状态、排期、成稿概况、风格/规则/账号概况、指标条数 |
+| `media_desk_ops` | 调用原有 `applyOps`，执行灵感增改、排期、风格和规则等结构化操作，沿用字段校验及撤销 |
+| `media_desk_insights` | 查询原有复盘汇总 |
+
+不要夸大覆盖范围：目前 state 是摘要，不返回全部成稿/图片内容；Producer 成稿、单图重画和发布尚未封装成上述工具。映射后的 Agent 不能仅凭口头回复声称这些动作已经完成。
+
+实测：工作台输入 → Agent 读状态 → 新建测试灵感 → 改标题及排期 → 回读确认 → 界面显示。测试条目已删除，验证会话记录保留；当时原有 3 条笔记和 48 条指标未修改。
+
+## 5. 其他已存在功能与用户约定
+
+- 插件模型自选仍用于原有裸模型通道；**映射聊天的模型由所选会话决定**。
+- 私用「思悟」风格卡保留；未包含在原 PR 范围里。
+- 文件桥仍可导出任务，手动“取收件箱”后写回成稿，Host 每 20 秒扫描回填并归档任务/成稿。
+- 文件桥协议：frontmatter 的 `itemId / mode / title / coverText / coverPrompt / coverFile / redraw`，正文后可带 `## 图文` 或 `## 分镜`；图文行可用 `说明 | file:xxx.png` 引用既有文件。
+- 风格页“抓我的账号”仍走 Monid，不要误称已替换所有 Monid 入口。
+
+### 图文与生图约定
+
+- 提示词表达用途、受众、核心信息、感觉、必需内容和硬规格，不默认替模型钉死构图、光线、字体、景别。
+- Owner 明确要求相信模型直接画中文，不要再把“中文不可靠”作为必须 canvas 叠字的理由。仍需检查实际输出。
+- 图像表现与精确排版按内容需要混用：需要画面表达时用生图，需要准确对照/步骤/数据排版时可用 guizang。**不强制全部 HTML，也不强制全部生图。**
+- 图数由信息量决定，不为凑数扩图。文件桥的图文/分镜截断已去掉；原一键成稿的设置和 `normalizePlan` 仍有数量约束，后续统一检查，不能宣称所有入口都已无限制。
+- 最近核实的接口为 magpie 本地 `127.0.0.1:3425/v1`、路由模型 `codex/gpt-image-2.5`；底层具体版本不能仅凭此前“2.6”口头说法认定。不要把密钥写进交接、提示词或日志。
+
+## 6. 定时任务：本次已核对
+
+- **收件箱定时取件已删除**，按 Owner 要求保持关闭，不自动恢复。
+- 创作中心抓取仍每天 **13:30 Asia/Shanghai** 运行，id 为 `schedule-c242ad0e-728e-4024-a751-6e869b773895`。
+- 发布排期只是工作台标记，不能当作已有自动发布任务。
+- 本次未变更任何定时任务。
+
+## 7. 下一次开发优先检查的事项
+
+### A. 整理本轮未提交代码，再决定提交范围
+
+先检查 diff 和新增文件，确认最新使用反馈，重新构建并做对应验证，再按 Owner 要求决定是否提交/推送或扩充 PR。不要只暂存 tracked 文件而漏掉三个新 Host 模块与会话选择组件。
+
+### B. 发布链路：入口传参已修，真实发布仍未验收
+
+Owner 授权规则已经明确：在工作台点“发布”并点“确认发布”，即授权该次发布，不必再追加审批。但这不授权 Agent 为测试随意发布现有草稿。
+
+当前 [发布脚本](./scripts/publish-xhs.mjs) 和 [Host runner](./src/host.js) 的两个实际 bug 已修：
+
+- 不能把脚本路径作为 `ego-browser nodejs` 参数传入：那会把绝对路径开头的 `/` 当正则，报 `Invalid regular expression flags`。现在 host 读取脚本和任务 JSON，把任务对象注入一次性 stdin 源码。
+- ego-browser 的 Node 运行时不继承自定义 shell 环境变量，不能依赖 `MEDIA_DESK_PUBLISH_TASK`；stdin 注入已绕开此限制。
+- 脚本已改用 ego-browser 的 `page.setInputFiles/page.fill/page.click(selector)`，不再把 `waitForSelector()` 返回值当 Playwright 元素对象。
+- 非发布验证已通过：stdin 注入入口输出正常、publish 脚本语法通过、77 个测试和构建通过；没有触发真实小红书发布。
+
+真实发布仍需 Owner 亲自点按钮验证。验证点：上传顺序和首图（当前只取 `production.images`，不自动纳入 cover）、标题/正文截断、平台成功回执、失败后是否可能重复提交。现有演示笔记是模拟草稿，不能把示例里的个人经历、实测时长或推测写成已验证事实。
+
+### C. 数据去重和指标口径
+
+[抓取脚本](./scripts/scrape-creator-centers.mjs) 的小红书缓存键含 `曝光数`：
+
+```js
+const key = `xhs:${n.date}:${n.title}:${num(n.exposure)}`
+```
+
+曝光变化会导致同一笔记变成新 key，再按基线写入，存在重复累计的明确代码风险。此前自动任务曾输出大量 baseline，不应继续直接称“去重完全正确”。下一次先备份并校验缓存/指标，以稳定内容 id 建键；历史数据是否已重复需要另外核对，不能直接推定每条都错或批量删数据。
+
+同样检查分页 `partial`、未知数值被变成 0、存量累计被记在发布日期却展示成日增趋势等口径问题。本次未修数、未改抓取任务。
+
+### D. 其余按需要排期
+
+- 用户是否还需要扩展成稿/图片读写工具，或在工作台里可视化展示工具执行进度。
+- 文件桥、直接 Agent 工具与一键成稿三条路径的分工，避免重复生产和重复消耗。
+- 私用风格、技能依赖与通用功能如何隔离后再进入上游 PR。
+
+## 8. 验证、运行和证据
+
+```bash
+# 在项目目录执行
+node --test test/*.test.js
+node scripts/build.mjs
+git diff --check
+```
+
+最近验证：77 个测试全部通过，覆盖基础功能、工具写入/撤销/取消、轮次关联与超时、会话标题列表及历史过滤。真实界面验证了 Agent 新增/修改/排期，以及两个命名会话切换和刷新持久化；不要把这些测试推及尚未实测的发布功能。
+
+本项目只留两张近期验收证据：
+
+- [工具联调截图](./_work/keep/agent-tools-verified.png)
+- [会话切换入口截图](./_work/keep/session-switch-picker.png)
+
+浏览器测试页面已关闭；没有为本次交接创建新的过程文件。旧创作素材在工作区其他位置，交接整理不擅自移动或删除。
+
+运行纪律：复用既有 GUI；不要手改 profile 包配置或在运行中随意移除共享依赖；ego 创建的 DSH 标签用完必须关闭，防止同主机连接池耗尽。旧会话 seq 损坏事故来自跨 Host 双写，不能把它和当前正规 Session inbox 投递混为一谈。

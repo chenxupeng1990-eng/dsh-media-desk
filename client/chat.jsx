@@ -1,6 +1,7 @@
 // 侧边对话：一句话改一切。解析和执行都在 Host，这里只负责展示回执。
 import React from 'react'
-import { clearChat, openItem, sendChat, setDesk, undo, useDesk } from './desk.js'
+import { clearChat, openItem, refreshMappedChat, sendChat, setDesk, undo, useDesk } from './desk.js'
+import { SessionButton } from './sessionpick.jsx'
 import { t } from './i18n.js'
 import { Icon, IconButton } from './ui.jsx'
 
@@ -41,7 +42,12 @@ function Message({ message, canUndoThis }) {
 /** 对话面板：首页的助手和成稿工作区共用。每条灵感有自己的对话。 */
 export function ChatPanel({ itemId, head, top = null, suggestions, placeholder, disabled = false, intro = true }) {
   const all = useDesk(s => s.state.chat)
-  const chat = React.useMemo(() => all.filter(m => (m.itemId ?? null) === (itemId ?? null)), [all, itemId])
+  const ownChat = React.useMemo(() => all.filter(m => (m.itemId ?? null) === (itemId ?? null)), [all, itemId])
+  const sessionId = useDesk(s => s.settings?.assistantSession)
+  const mappedChat = useDesk(s => s.mappedChat)
+  const mappedSession = useDesk(s => s.mappedSession)
+  const mappedError = useDesk(s => s.mappedChatError)
+  const chat = sessionId ? mappedChat : ownChat
   const thinking = useDesk(s => s.thinking)
   const quote = useDesk(s => s.chatQuote)
   const [text, setText] = React.useState('')
@@ -49,8 +55,21 @@ export function ChatPanel({ itemId, head, top = null, suggestions, placeholder, 
   const input = React.useRef(null)
 
   React.useEffect(() => {
+    setText('')
+    if (!sessionId) return
+    let pending = false
+    const tick = async () => {
+      if (pending) return
+      pending = true
+      try { await refreshMappedChat(sessionId) } finally { pending = false }
+    }
+    tick()
+    const timer = setInterval(tick, 3000)
+    return () => clearInterval(timer)
+  }, [sessionId])
+  React.useEffect(() => {
     if (scroller.current) scroller.current.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
-  }, [chat.length, thinking])
+  }, [chat.length, thinking, sessionId])
   React.useLayoutEffect(() => {
     const el = input.current
     if (!el) return
@@ -72,7 +91,13 @@ export function ChatPanel({ itemId, head, top = null, suggestions, placeholder, 
   return (
     <div className="md-chat">
       <header className="md-dock-head" data-window-drag="">{head}</header>
+      <div className="md-session-bar">
+        <div><small>{t('当前会话')}</small><strong title={sessionId ? mappedSession?.title : t('插件自带助手')}>{sessionId ? mappedSession?.title || t('正在读取会话…') : t('插件自带助手')}</strong></div>
+        <SessionButton />
+      </div>
       <div className="md-dock-scroll" ref={scroller} aria-live="polite">
+        {mappedError && sessionId ? <p role="alert" className="md-msg-error">{mappedError}</p> : null}
+        {sessionId && mappedSession?.hasMore ? <p className="md-msg-note">{t('这里显示最近的聊天，完整历史可在侧边栏查看。')}</p> : null}
         {top}
         {chat.length === 0 && intro ? (
           <div className="md-dock-intro">
@@ -120,6 +145,7 @@ export function ChatDock() {
   const model = useDesk(s => s.model)
   const modelOk = useDesk(s => s.modelOk)
   const modelError = useDesk(s => s.modelError)
+  const sessionId = useDesk(s => s.settings?.assistantSession)
   const hasChat = useDesk(s => s.state.chat.some(m => !m.itemId))
   return (
     <aside className="md-dock" aria-label={t('对话助手')}>
@@ -127,11 +153,11 @@ export function ChatDock() {
         head={(
           <>
             <h2>{t('助手')}</h2>
-            <span className={`md-engine ${!model ? '' : modelOk === false ? 'is-down' : 'is-live'}`} title={!model ? t('当前没有可用模型，只能处理常见说法') : modelOk === false ? `${t('模型 {model} 暂时用不了，现在只能处理常见说法。', { model })}${modelError ? `\n${modelError}` : ''}` : t('使用 DeepSeek Harness 当前模型 {model}', { model })}>
+            {!sessionId ? <span className={`md-engine ${!model ? '' : modelOk === false ? 'is-down' : 'is-live'}`} title={!model ? t('当前没有可用模型，只能处理常见说法') : modelOk === false ? `${t('模型 {model} 暂时用不了，现在只能处理常见说法。', { model })}${modelError ? `\n${modelError}` : ''}` : t('使用 DeepSeek Harness 当前模型 {model}', { model })}>
               <i />{!model ? t('本地规则') : modelOk === false ? t('模型未连接') : model}
-            </span>
+            </span> : null}
             <span style={{ flex: 1 }} />
-            {hasChat ? <IconButton icon="refresh" label={t('清空对话')} onClick={clearChat} /> : null}
+            {sessionId ? <IconButton icon="refresh" label={t('刷新会话记录')} onClick={() => refreshMappedChat(sessionId)} /> : hasChat ? <IconButton icon="refresh" label={t('清空对话')} onClick={clearChat} /> : null}
             <IconButton icon="close" label={t('收起对话')} onClick={() => setDesk({ dockOpen: false })} />
           </>
         )}
