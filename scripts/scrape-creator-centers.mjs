@@ -26,7 +26,8 @@ function isLoginWall(text) {
 /** 小红书：内容分析表，逐笔记累计值。首次见的笔记按发布日期记存量，之后记增量。 */
 async function scrapeXhs(page, cache, rows) {
   await page.goto('https://creator.xiaohongshu.com/statistics/data-analysis', { timeout: 45000 }).catch(() => {})
-  await new Promise(r => setTimeout(r, 6000))
+  // 等表格真正渲染，别用固定 sleep——加载慢的那天表格会晚几秒出现
+  await page.waitForSelector('table tbody tr', { timeout: 25000 }).catch(() => {})
   // 一页 50 条，免去翻页
   await page.evaluate(() => {
     const leaf = txt => [...document.querySelectorAll('li, div, span')].find(e => e.children.length === 0 && (e.textContent || '').trim() === txt)
@@ -50,6 +51,20 @@ async function scrapeXhs(page, cache, rows) {
     const total = Number(/共 (\d+) 条/.exec(document.body.innerText)?.[1]) || 0
     return { total, rows: out }
   })
+  // 表格偶发晚到或切分页时重渲染：解析为空就再等一次重试，而不是直接报错
+  if (!notes.rows.length) {
+    await new Promise(r => setTimeout(r, 6000))
+    notes.rows = await page.evaluate(() => {
+      const out = []
+      for (const tr of document.querySelectorAll('table tbody tr')) {
+        const t = (tr.innerText || '').replace(/\s+/g, ' ').trim()
+        const m = /(.+?)发布于(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}\s+([\d,]+)\s+([\d,]+)\s+[\d.]+%\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)/.exec(t)
+        if (!m) continue
+        out.push({ title: m[1].trim().slice(0, 60), date: m[2], exposure: m[3], views: m[4], likes: m[5], comments: m[6], saves: m[7], shares: m[9] })
+      }
+      return out
+    })
+  }
   if (!notes.rows.length) {
     const text = await page.evaluate(() => document.body.innerText)
     if (isLoginWall(text)) throw new Error('小红书登录失效，需要在 ego 浏览器里重新登录')
@@ -109,13 +124,16 @@ async function scrapeBili(page, cache, rows) {
 async function scrapeDouyin(page, cache, rows) {
   await page.goto('https://creator.douyin.com/creator-micro/data-center/operation', { timeout: 60000 }).catch(() => {})
   await page.waitForLoadState('load').catch(() => {})
-  await new Promise(r => setTimeout(r, 8000))
+  // 等「昨天」标签真正出现再点，别用固定 sleep
+  await page.waitForFunction(() => [...document.querySelectorAll('div, span, button, a')].some(e => e.children.length === 0 && (e.textContent || '').trim() === '昨天'), { timeout: 25000 }).catch(() => {})
   await page.evaluate(() => {
     const hit = [...document.querySelectorAll('div, span, button, a')].find(e => e.children.length === 0 && (e.textContent || '').trim() === '昨天')
     if (hit) hit.click()
   })
-  await new Promise(r => setTimeout(r, 4000))
-  const data = await page.evaluate(() => {
+  // 等「总播放量」真的渲染出来再解析；切标签后数据是异步拉的
+  await page.waitForFunction(() => /总播放量/.test(document.body.innerText), { timeout: 20000 }).catch(() => {})
+  await new Promise(r => setTimeout(r, 1500))
+  const parse = () => page.evaluate(() => {
     const t = document.body.innerText.replace(/\s+/g, ' ')
     const seg = t.slice(t.indexOf('作品数据'), t.indexOf('粉丝数据') > t.indexOf('作品数据') ? t.indexOf('粉丝数据') : undefined)
     const day = /统计周期：(\d{4}-\d{2}-\d{2})/.exec(seg)?.[1]
@@ -125,6 +143,16 @@ async function scrapeDouyin(page, cache, rows) {
     }
     return { day, views: grab('总播放量'), likes: grab('总点赞量'), comments: grab('总评论量'), shares: grab('总分享量'), saves: grab('总收藏量') }
   })
+  let data = await parse()
+  // 「昨天」标签有时要点两次才切换成功；没拿到汇总就再点一次
+  if (!data.day || data.views === null) {
+    await page.evaluate(() => {
+      const hit = [...document.querySelectorAll('div, span, button, a')].find(e => e.children.length === 0 && (e.textContent || '').trim() === '昨天')
+      if (hit) hit.click()
+    })
+    await new Promise(r => setTimeout(r, 5000))
+    data = await parse()
+  }
   if (!data.day || data.views === null) {
     const text = await page.evaluate(() => document.body.innerText)
     if (isLoginWall(text)) throw new Error('抖音登录失效，需要在 ego 浏览器里重新登录')
