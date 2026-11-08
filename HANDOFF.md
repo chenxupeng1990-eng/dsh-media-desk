@@ -129,18 +129,17 @@
 
 先检查 diff 和新增文件，确认最新使用反馈，重新构建并做对应验证，再按 Owner 要求决定是否提交/推送或扩充 PR。不要只暂存 tracked 文件而漏掉三个新 Host 模块与会话选择组件。
 
-### B. 发布链路：入口传参已修，真实发布仍未验收
+### B. 发布链路：dry-run 已到「填完待发」，只差 Owner 点一次真发（2026-11-08）
 
 Owner 授权规则已经明确：在工作台点“发布”并点“确认发布”，即授权该次发布，不必再追加审批。但这不授权 Agent 为测试随意发布现有草稿。
 
-当前 [发布脚本](./scripts/publish-xhs.mjs) 和 [Host runner](./src/host.js) 的两个实际 bug 已修：
+2026-11-08 已修复并验证到发布前一步：
 
-- 不能把脚本路径作为 `ego-browser nodejs` 参数传入：那会把绝对路径开头的 `/` 当正则，报 `Invalid regular expression flags`。现在 host 读取脚本和任务 JSON，把任务对象注入一次性 stdin 源码。
-- ego-browser 的 Node 运行时不继承自定义 shell 环境变量，不能依赖 `MEDIA_DESK_PUBLISH_TASK`；stdin 注入已绕开此限制。
-- 脚本已改用 ego-browser 的 `page.setInputFiles/page.fill/page.click(selector)`，不再把 `waitForSelector()` 返回值当 Playwright 元素对象。
-- 非发布验证已通过：stdin 注入入口输出正常、publish 脚本语法通过、77 个测试和构建通过；没有触发真实小红书发布。
-
-真实发布仍需 Owner 亲自点按钮验证。验证点：上传顺序和首图（当前只取 `production.images`，不自动纳入 cover）、标题/正文截断、平台成功回执、失败后是否可能重复提交。现有演示笔记是模拟草稿，不能把示例里的个人经历、实测时长或推测写成已验证事实。
+- 三个实际 bug 已修：① 脚本路径不能作为 `ego-browser nodejs` 参数（路径被当正则，报 `Invalid regular expression flags`）——改为 host 读取脚本+任务 JSON，任务对象注入一次性 stdin 源码；② ego-browser Node 运行时不继承自定义 shell 环境变量——stdin 注入同时绕开；③ **发布页默认开在「上传视频」签，脚本没切「上传图文」就把 PNG 传给了只收视频的上传框**——现在先点视口内可见的「上传图文」签，等图片上传框（accept 含 png，隐藏元素用 DOM 轮询等待）出现再传图。
+- 编辑器是 Tiptap（`.tiptap.ProseMirror`），不是旧脚本找的 Quill；输入正文后按 Escape 关掉话题联想下拉再点发布。
+- ego API 差异：`waitForFunction(fn, argument, options)` 的 options 是第三个参数；`waitForSelector` 默认等可见元素，隐藏上传框要用 `waitForFunction` 轮询 DOM。
+- **dryRun 全链路已验证**：4 张卡片按序上传（缩略图 1-4）、标题（19 字）和正文（含话题标签）填好、手机预览正常，停在发布前；任务支持 `dryRun` 和 `screenshotPath` 字段（失败自动留页面截图）。
+- 已提交 `0508b75`。剩余唯一步骤：Owner 在工作台点「发布」→「确认发布」。若再失败，错误里会带失败时页面截图路径。
 
 ### C. 数据去重和指标口径
 
