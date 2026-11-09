@@ -10,6 +10,7 @@ import { defaultExportDir, resolveExportDir, saveProduction } from './export.js'
 import { harvest, harvestText } from './harvest.js'
 import { generateImage } from './images.js'
 import { localIntent } from './intents.js'
+import { Ledger } from './ledger.js'
 import { computeInsights, exportSkill, proposeRules } from './learn.js'
 import { createMonidRunner, fetchAccount, importPosts, monidStatus, postsToMaterial, resolveAccount, saveCovers } from './monid.js'
 import { applyOps, newId } from './ops.js'
@@ -83,12 +84,19 @@ async function sendFile(req, res, file) {
     res.statusCode = 206
     res.setHeader('content-range', `bytes ${start}-${end}/${info.size}`)
     res.setHeader('content-length', end - start + 1)
-    return createReadStream(file, { start, end }).pipe(res)
+    return streamFile(res, createReadStream(file, { start, end }))
   }
   res.statusCode = 200
   res.setHeader('content-length', info.size)
   if (req.method === 'HEAD') return res.end()
-  return createReadStream(file).pipe(res)
+  return streamFile(res, createReadStream(file))
+}
+
+/** 文件在 stat 之后被删或读失败时，流的 error 没有监听会变成未捕获异常拖垮整个 DSH 进程。 */
+function streamFile(res, stream) {
+  stream.on('error', () => res.destroy())
+  res.on('close', () => stream.destroy())
+  return stream.pipe(res)
 }
 
 function engineLabel(ctx) {
@@ -603,20 +611,9 @@ async function route(ctx, store, desk, req, res) {
       })
     }
     if (path === 'insights') return json(res, 200, computeInsights(await store.read()))
+    if (path === 'ledger') return json(res, 200, await desk.ledger.summary())
     if (path === 'sessions') {
-      const result = await listDeskSessions(ctx, desk.settings)
-      const probeAgent = url.searchParams.get('probeCommands')
-      if (probeAgent) {
-        const resolved = await ctx.get('sessionController').resolveAgent(probeAgent).catch(err => ({ error: { message: err.message } }))
-        result.commandList = resolved?.agent ? ctx.get('commands').list(resolved.agent).map(row => row.name) : { error: resolved?.error?.message ?? 'unknown' }
-        if (url.searchParams.get('execCommand')) {
-          try {
-            const execution = await ctx.get('commands').execute(resolved.agent, url.searchParams.get('execCommand'), [], AbortSignal.timeout(60000))
-            result.execResult = execution ? { kind: execution.result?.kind, text: execution.result?.text ?? '' } : 'undefined (not resolved)'
-          } catch (err) { result.execResult = { error: err.message } }
-        }
-      }
-      return json(res, 200, result)
+      return json(res, 200, await listDeskSessions(ctx, desk.settings))
     }
     if (path === 'session-chat') {
       const sessionId = url.searchParams.get('sessionId') ?? ''
@@ -700,6 +697,16 @@ async function route(ctx, store, desk, req, res) {
       if (!sc || !workspaceId) throw Object.assign(new Error(tr('先选一个工作区')), { status: 400 })
       return json(res, 200, await sc.create({ workspaceId }))
     }
+    case 'ledger/ingest': {
+      const list = value => (Array.isArray(value) ? value : [])
+      if (list(body.content).length > 1000 || list(body.account).length > 200) throw Object.assign(new Error(tr('内容太大')), { status: 413 })
+      return json(res, 200, await desk.ledger.ingest(String(body.date ?? ''), { content: list(body.content), account: list(body.account) }))
+    }
+    case 'ledger/reveal': {
+      await mkdir(desk.ledger.dir, { recursive: true })
+      execFile(process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open', [desk.ledger.dir], () => {})
+      return json(res, 200, { path: desk.ledger.dir })
+    }
     case 'publish': return json(res, 200, await runPublish(store, desk, body))
     case 'scrape': {
       const result = await runScrape(desk)
@@ -769,7 +776,7 @@ export default {
     const settings = new Settings(store.root)
     const producer = new Producer({ store, settings, callText: options => callModel(ctx, options), generate: generateImage })
     const monid = createMonidRunner()
-    const desk = { settings, producer, monid, storeRoot: store.root }
+    const desk = { settings, producer, monid, storeRoot: store.root, ledger: new Ledger(store.root) }
     // 启动时恢复用户在工作台里选过的助手模型
     settings.read().then(saved => setAssistantModel(saved.assistant)).catch(() => {})
     // 成稿文件桥：启动扫一次，之后每 20 秒看一眼 inbox。unref 让定时器不持事件循环，测试进程能正常退出。

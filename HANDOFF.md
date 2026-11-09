@@ -1,4 +1,4 @@
-# HANDOFF — dsh-media-desk · 2026-11-08 00:26 +08:00
+# HANDOFF — dsh-media-desk · 2026-11-09 10:50 +08:00（本轮改动见第 9 节）
 
 > Owner 本次决定：先写交接，下一次再开发。此次只整理文档，不继续改功能、不发布笔记、不提交或推送代码。
 > 工作目录：`/Users/allbychen/Documents/思悟工作区/projects/dsh-media-desk`。
@@ -20,34 +20,16 @@
 
 ## 2. 分支、工作树与安装方式
 
-- 当前分支：`siwu-local`，基于上游 v2.6.1 的本地改版。
-- 本次检查到的最新提交：`5d5feab`（旧版会话映射实现）。**今晚的 Tool 接口、轮次等待修复、按标题切换与真实历史展示，都还在工作树中，尚未提交、尚未推送。** 不要误以为 fork 已备份这些新改动。
-- 已存在的上游 PR：[woniuniuniu/dsh-media-desk#5](https://github.com/woniuniuniu/dsh-media-desk/pull/5)，原范围为模型自选和创作中心数据抓取。本轮未更新 PR，也未查询其最新审阅状态。
+- 仓库：本地 git，当前分支 `siwu-local`（基于上游 v2.6.1 的本地改版）。远程两个：`origin` = 上游 woniuniuniu/dsh-media-desk，`fork` = chenxupeng1990-eng/dsh-media-desk。
+- **推送状态（2026-11-09 核对）：** `siwu-local` **没有设置上游分支**，本地 HEAD `e6c8147` 比 `fork/siwu-local`（`5d5feab`）多 **24 个提交，尚未推送**。fork 上的 `feat/assistant-model-and-scrape` 停在 `c4f9380`，是 PR 的分支。也就是说 fork 上没有这些新代码的备份。
+- 本轮（第 9 节）的改动**全部未提交**。提交前先看 `git status`；`_work/` 是过程目录，不要无差别暂存。
+- 已存在的上游 PR：[woniuniuniu/dsh-media-desk#5](https://github.com/woniuniuniu/dsh-media-desk/pull/5)，原范围为模型自选和创作中心数据抓取。未更新 PR，也未查询其最新审阅状态。
 - 当前 profile 通过本地目录链接安装本项目，插件 entry id 为 `include:media-desk`；Web GUI 为 `http://127.0.0.1:3080`。
-- 接手先检查 `git status` 和 diff。保留未提交及未跟踪文件，不执行清理工作树、强制回退或直接覆盖。
-- 客户端改动需先构建，再通过插件管理器重载并刷新现有 GUI。不要另开服务器来代替验证，也不要在插件管理器直接升级到 npm 版覆盖本地功能。
+- 客户端改动需先构建（`node scripts/build.mjs`），再重载插件并刷新 GUI；**host 侧（`src/*.js`）改动要重载插件或重启 DSH web 才生效**。不要另开服务器来代替验证，也不要在插件管理器直接升级到 npm 版覆盖本地功能。
 
 ### 尚未提交的文件
 
-已修改：
-
-- [HANDOFF.md](./HANDOFF.md)
-- [client/chat.jsx](./client/chat.jsx)、[client/desk.js](./client/desk.js)
-- [client/index.jsx](./client/index.jsx)、[client/settings.jsx](./client/settings.jsx)、[client/modelpick.jsx](./client/modelpick.jsx)
-- [client/en/core.js](./client/en/core.js)、[client/styles.css](./client/styles.css)
-- [src/host.js](./src/host.js)、[src/en.js](./src/en.js)
-
-新增且未跟踪，后续提交时务必包含：
-
-- [src/tools.js](./src/tools.js)
-- [src/session-chat.js](./src/session-chat.js)
-- [src/session-history.js](./src/session-history.js)
-- [client/sessionpick.jsx](./client/sessionpick.jsx)
-- [test/tools.test.js](./test/tools.test.js)
-- [test/session-chat.test.js](./test/session-chat.test.js)
-- [test/session-history.test.js](./test/session-history.test.js)
-
-过程证据目录也未跟踪；不要用无差别暂存把截图混进代码提交。
+见第 9 节「本轮改动清单」。此前列出的会话映射、Tool 接口等文件已在后续提交中。
 
 ## 3. 当前会话映射怎样工作
 
@@ -151,6 +133,8 @@ Owner 授权规则已经明确：在工作台点“发布”并点“确认发�
 - 同时把固定 sleep 换成 `waitForSelector` 等真实渲染信号 + 解析为空重试一次（13:30 定时任务当天因页面加载慢解析到 0 行而误报，B站正常说明不是登录或改版）。
 - 重跑验证：三平台无错误，小红书 19/19 解析，总量对账一致（16,900 = 昨晚 15,838 + 当日新增 807+36+54+165）。
 
+**2026-11-09 复查：** 上述去重键修复在已提交的 `HEAD` 脚本里并不存在（键仍带曝光，与缓存文件里的键不一致），当天定时抓取会重复入账。已在第 9 节重新修复（键 `xhs:日期:标题`，同天同标题加 `#n`）。
+
 **仍待清理**：更早的多基线行（同一笔记在不同抓取日被记了多条发布日基线，如 11-02 发布的笔记有 139/145 两条）——需按笔记分组保留最新累计、删除旧基线，删除前先逐条核对；历史日趋势图会因此变化，动前再备份一次。分页 `partial`、未知数值变 0 等口径问题一并检查。
 
 ### D. 映射会话对模型路由切换敏感（2026-11-08 凌晨实测报错）
@@ -174,7 +158,7 @@ node scripts/build.mjs
 git diff --check
 ```
 
-最近验证：77 个测试全部通过，覆盖基础功能、工具写入/撤销/取消、轮次关联与超时、会话标题列表及历史过滤。真实界面验证了 Agent 新增/修改/排期，以及两个命名会话切换和刷新持久化；不要把这些测试推及尚未实测的发布功能。
+最近验证（2026-11-09）：84 个测试全部通过；此前为 77 个，覆盖基础功能、工具写入/撤销/取消、轮次关联与超时、会话标题列表及历史过滤。真实界面验证了 Agent 新增/修改/排期，以及两个命名会话切换和刷新持久化；不要把这些测试推及尚未实测的发布功能。
 
 本项目只留两张近期验收证据：
 
@@ -184,3 +168,34 @@ git diff --check
 浏览器测试页面已关闭；没有为本次交接创建新的过程文件。旧创作素材在工作区其他位置，交接整理不擅自移动或删除。
 
 运行纪律：复用既有 GUI；不要手改 profile 包配置或在运行中随意移除共享依赖；ego 创建的 DSH 标签用完必须关闭，防止同主机连接池耗尽。旧会话 seq 损坏事故来自跨 Host 双写，不能把它和当前正规 Session inbox 投递混为一谈。
+
+## 9. 本轮改动清单（2026-11-09，全部未提交）
+
+### 9.1 三处修复
+- **去重键：** [scripts/scrape-creator-centers.mjs](./scripts/scrape-creator-centers.mjs) 小红书缓存键改为 `xhs:发布日期:标题`，同一天同标题的按出现顺序加 `#2`。真实抓取验证：新笔记基线只有 1 条，其余为真实增量，无重复。
+- **调试后门：** 删除 `src/host.js` 里 `GET /media-desk/sessions?probeCommands=…&execCommand=…`（可经 GET 执行任意已注册命令，且不走跨站检查）。
+- **文件流：** `sendFile` 改用 `streamFile`，流 error 时销毁响应，避免未捕获异常拖垮整个 DSH 进程。
+- 另：`src/tools.js` 的 `required: true` 改为标准 `required: ['ops']`（Codex 后端拒收旧写法，会话每轮报 `Invalid schema for function 'media_desk_ops'`）。
+
+### 9.2 数据沉淀表（新功能）
+- **是什么：** 抓取时追加「内容每日快照」「账号每日快照」到本地 CSV：`~/.dsh/media-desk/data/内容每日快照.csv`、`账号每日快照.csv`（UTF-8 带 BOM，Excel 直接打开）。复盘页底部「数据沉淀」面板读同一份数据（平台 / 每日 / 内容 三个视图 + 打开数据表按钮）。
+- **口径：** 累计值按抓到的原值存；日增 = 与此前最近一次快照相减，首次出现留空；比率（点击率、完播率等）只存原值、不相加；后台没给的字段留空，不写 0；同一天重跑覆盖当天的行。汇总时比率按曝光（无则按播放）加权，**少于一半内容有该指标时不汇总**（抖音只给少数视频封面点击率）。三个平台的完播率口径不同，B站只有「平均播放进度」，单独一列，不能直接比较。
+- **新增文件：** `src/ledger.js`（快照、增量、CSV、汇总）、`client/ledger.jsx`、`test/ledger.test.js`。
+- **改动文件：** `src/host.js`（路由 `GET ledger`、`POST ledger/ingest`、`POST ledger/reveal`）、`client/desk.js`、`client/insights.jsx`、`client/styles.css`、`client/en/pages.js`、抓取脚本。
+- **抓取来源：** 小红书笔记表（曝光、观看、封面点击率、涨粉、人均观看时长等）+ 账号诊断 + 粉丝数据；B站「数据中心」是 iframe，直接访问 `https://member.bilibili.com/york/data-center-web?tmid=&bvid=&tab=` 读稿件表；抖音「投稿分析-投稿列表」按表头名取列 + 数据总览 + 粉丝数据。B站账号层只存粉丝总数和当日变化（页面上的播放/访客有两列数字，口径没弄清，未存）。
+- **没有历史：** 累计型字段后台不给历史，沉淀表从第一次抓取（2026-11-09）开始，笔记级数据无法回填。小红书账号层「曝光」是后台四舍五入的近似值（如 1.6万）。
+- **写入失败不影响工作台：** 沉淀表写入单独 try，失败只往 `errors` 记一条（旧版插件没有该接口时为 404）。
+
+### 9.3 抓取脚本的可靠性
+- **`page.waitForFunction(fn, arg, { timeout })` 的选项是第 3 个参数。** 原脚本写成第 2 个，调用立即报错并被 `.catch` 吞掉，等于从没等过，会抓到加载中的 0 占位值（小红书粉丝数曾显示 0）。已全部改对，并改为等到真数据出现（粉丝数非 0、表格首格非空等）。
+- 沉淀表的补充抓取各自独立 try，失败记 `沉淀表·…` 错误，不影响原三平台流程；工作台指标写入失败不再让脚本崩溃，而是记入 `errors` 并照常输出 `SCRAPE_RESULT`。
+- **干跑**（只抓取并打印快照，不写工作台、缓存、沉淀表）：`( echo 'globalThis.__MEDIA_DESK_DRY = true;'; cat scripts/scrape-creator-centers.mjs ) | ego-browser nodejs`。
+
+### 9.4 验证状态
+- 84 个测试通过；`node scripts/build.mjs` 成功；真实抓取 1 次（写入 18 条工作台数据 + 沉淀表 39 条内容、4 行账号，无错误）；面板在真实页面上看过一次。
+- **未验证：** 日增（只有 1 天快照，明天起才有）；抖音逐条表的数值是否为累计值（从 145 涨到 161 看起来是，需两天快照确认）；B站稿件表只覆盖「近期稿件」前几条，更早的不在其中；抖音标题字段带了描述文字（截到 60 字符，作为内容标识的一部分，描述改动会让标识变化）；`publish-xhs.mjs` 打开的页面仍未关闭（与此前 DSH 卡死同类，未改）；`package.json` 的 `files` 不含 `scripts/`，npm 安装的用户按钮会缺脚本（本地链接安装不受影响）。
+
+### 9.5 运行注意
+- **每次重启 DSH web，token 变化，ego 浏览器里的登录态失效。** 抓取脚本经 ego 里的 DSH 标签同源写入，重启后要先在 ego 里用新链接打开一次，否则写入会 401。当前 DSH web 由 Claude 在终端标签 `c1` 里启动（`dsh web --no-open`）。
+- 定时任务每天 13:30 抓取，没改。
+- 过程文件已清理，调研用的页面转储含他人评论文字，已移入废纸篓。

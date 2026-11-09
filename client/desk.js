@@ -374,6 +374,20 @@ export async function fetchInsights() {
   return request('insights')
 }
 
+/** 数据沉淀表的统计：各平台最新累计与比率、每日累计与日增、逐条内容。 */
+export async function fetchLedger() {
+  return request('ledger')
+}
+
+/** 在访达里打开数据沉淀表（CSV）所在的文件夹。 */
+export async function openLedgerFolder() {
+  try {
+    await request('ledger/reveal', {})
+  } catch (err) {
+    report(err)
+  }
+}
+
 /** 一键发布到小红书：在 ego 浏览器里自动填写并直接发布（按钮点击即授权）。 */
 export async function runPublish(id) {
   try {

@@ -1,6 +1,7 @@
 // 数据复盘。
 import React from 'react'
-import { dispatchOps, fetchInsights, learnSkills, openItem, runScrape, setDesk, toast, useDesk } from './desk.js'
+import { dispatchOps, fetchInsights, fetchLedger, learnSkills, openItem, runScrape, setDesk, toast, useDesk } from './desk.js'
+import { LedgerPanel } from './ledger.jsx'
 import { EN } from './en/index.js'
 import { lang, plural, t, useLang } from './i18n.js'
 import { Icon, Segmented } from './ui.jsx'
@@ -152,12 +153,20 @@ export function InsightsView() {
   const [data, setData] = React.useState(null)
   const [show, setShow] = React.useState('chart')
   const [scraping, setScraping] = React.useState(false)
+  const [ledger, setLedger] = React.useState(null)
+  const [ledgerTick, setLedgerTick] = React.useState(0)
   const accounts = useDesk(s => s.state.accounts)
   React.useEffect(() => {
     let alive = true
     fetchInsights().then((next) => { if (alive) setData(next) }).catch(err => toast(err.message, { error: true }))
     return () => { alive = false }
   }, [metrics, items])
+  // 沉淀表由抓取直接追加，不经过工作台状态，所以抓完要主动刷新一次
+  React.useEffect(() => {
+    let alive = true
+    fetchLedger().then((next) => { if (alive) setLedger(next) }).catch(() => { if (alive) setLedger(null) })
+    return () => { alive = false }
+  }, [ledgerTick])
   if (!data) return <div className="md-board-page"><div className="md-tile md-i-hero" /></div>
   // 有真实数据后，不再把示例规则当建议
   const proposed = skills.filter(s => s.status === 'proposed' && (data.hasSample || !s.sample))
@@ -171,7 +180,7 @@ export function InsightsView() {
   const heroPic = bestItem && posterOf(displayItem(bestItem))
   const actions = (
     <div className="md-hero-actions">
-      <button type="button" className="md-pill is-primary" disabled={scraping} onClick={async () => { setScraping(true); await runScrape(); setScraping(false) }}><Icon name="refresh" size={14} />{scraping ? t('正在抓取后台数据…') : t('抓取后台数据')}</button>
+      <button type="button" className="md-pill is-primary" disabled={scraping} onClick={async () => { setScraping(true); await runScrape(); setScraping(false); setLedgerTick(n => n + 1) }}><Icon name="refresh" size={14} />{scraping ? t('正在抓取后台数据…') : t('抓取后台数据')}</button>
       <button type="button" className="md-pill" onClick={() => addMetric(items)}><Icon name="plus" size={14} />{t('录入数据')}</button>
       <button type="button" className="md-pill" onClick={importCsv}><Icon name="upload" size={14} />{t('粘贴 CSV')}</button>
     </div>
@@ -272,6 +281,8 @@ export function InsightsView() {
             )) : <p className="md-muted">{t('点「重新分析」，从现有数据里找出值得坚持的做法。')}</p>}
           </div>
         </section>
+
+        <LedgerPanel ledger={ledger} />
       </div>
     </div>
   )

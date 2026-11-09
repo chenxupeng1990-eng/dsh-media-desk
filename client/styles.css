@@ -698,13 +698,19 @@ button.md-receipt:hover { transform: translateX(2px); }
 .md-tray-item > span:last-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 复盘 */
-.md-insights { min-height: 100%; display: grid; gap: 10px; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); grid-template-rows: auto minmax(240px, 1fr) minmax(250px, 1fr); grid-template-areas: "hero hero" "trend platforms" "top advice"; }
-@container (max-width: 760px) { .md-insights { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "hero" "trend" "platforms" "top" "advice"; } .md-i-trend { height: 300px; } }
+.md-insights { min-height: 100%; display: grid; gap: 10px; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); grid-template-rows: auto minmax(240px, 1fr) minmax(250px, 1fr) auto; grid-template-areas: "hero hero" "trend platforms" "top advice" "ledger ledger"; }
+@container (max-width: 760px) { .md-insights { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "hero" "trend" "platforms" "top" "advice" "ledger"; } .md-i-trend { height: 300px; } }
 .md-insights .md-i-hero { grid-area: hero; }
 .md-i-trend { grid-area: trend; }
 .md-i-platforms { grid-area: platforms; }
 .md-i-top { grid-area: top; }
 .md-i-advice { grid-area: advice; }
+.md-i-ledger { grid-area: ledger; }
+.md-ledger-table { max-height: 360px; overflow: auto; padding: 0 12px; }
+.md-ledger-table .md-table th:first-child, .md-ledger-table .md-table td:first-child { padding-left: 6px; }
+.md-delta { color: var(--ink3); font-size: 11px; }
+.md-ledger-note { margin: 0; padding: 10px 18px 14px; font-size: 12px; line-height: 18px; }
+.md-i-ledger > .md-muted:not(.md-ledger-note) { padding: 4px 18px 18px; }
 .md-metrics { flex: none; align-self: center; display: flex; gap: 22px; margin-right: 8px; }
 .md-metric dt { color: var(--ink3); font-size: 12px; line-height: 16px; }
 .md-metric dd { font-family: var(--latin-serif); font-size: 32px; line-height: 42px; letter-spacing: -.01em; }
