@@ -1,4 +1,4 @@
-# HANDOFF — dsh-media-desk · 2026-11-09 10:50 +08:00（本轮改动见第 9 节）
+# HANDOFF — dsh-media-desk · 2026-11-09 10:38 +08:00（本轮改动见第 9 节）
 
 > Owner 本次决定：先写交接，下一次再开发。此次只整理文档，不继续改功能、不发布笔记、不提交或推送代码。
 > 工作目录：`/Users/allbychen/Documents/思悟工作区/projects/dsh-media-desk`。
@@ -21,8 +21,8 @@
 ## 2. 分支、工作树与安装方式
 
 - 仓库：本地 git，当前分支 `siwu-local`（基于上游 v2.6.1 的本地改版）。远程两个：`origin` = 上游 woniuniuniu/dsh-media-desk，`fork` = chenxupeng1990-eng/dsh-media-desk。
-- **推送状态（2026-11-09 核对）：** `siwu-local` **没有设置上游分支**，本地 HEAD `e6c8147` 比 `fork/siwu-local`（`5d5feab`）多 **24 个提交，尚未推送**。fork 上的 `feat/assistant-model-and-scrape` 停在 `c4f9380`，是 PR 的分支。也就是说 fork 上没有这些新代码的备份。
-- 本轮（第 9 节）的改动**全部未提交**。提交前先看 `git status`；`_work/` 是过程目录，不要无差别暂存。
+- **推送状态（2026-11-09 10:38 核对）：** `siwu-local` **没有设置上游分支**，本地 HEAD `23a5de6` 仅比 `fork/siwu-local`（`5d5feab`）多 **9 个本地提交，尚未推送**。fork 上的 `feat/assistant-model-and-scrape` 停在 `c4f9380`，是 PR 的分支。也就是说 fork 上没有抓取去重、数据沉淀、斜杠命令等新代码的备份。
+- 本轮（第 9 节）的改动**已全部提交为 `23a5de6`，尚未推送**。`_work/` 是过程目录，不要无差别暂存。
 - 已存在的上游 PR：[woniuniuniu/dsh-media-desk#5](https://github.com/woniuniuniu/dsh-media-desk/pull/5)，原范围为模型自选和创作中心数据抓取。未更新 PR，也未查询其最新审阅状态。
 - 当前 profile 通过本地目录链接安装本项目，插件 entry id 为 `include:media-desk`；Web GUI 为 `http://127.0.0.1:3080`。
 - 客户端改动需先构建（`node scripts/build.mjs`），再重载插件并刷新 GUI；**host 侧（`src/*.js`）改动要重载插件或重启 DSH web 才生效**。不要另开服务器来代替验证，也不要在插件管理器直接升级到 npm 版覆盖本地功能。
@@ -169,7 +169,7 @@ git diff --check
 
 运行纪律：复用既有 GUI；不要手改 profile 包配置或在运行中随意移除共享依赖；ego 创建的 DSH 标签用完必须关闭，防止同主机连接池耗尽。旧会话 seq 损坏事故来自跨 Host 双写，不能把它和当前正规 Session inbox 投递混为一谈。
 
-## 9. 本轮改动清单（2026-11-09，全部未提交）
+## 9. 本轮改动清单（2026-11-09，已提交为 `23a5de6`）
 
 ### 9.1 三处修复
 - **去重键：** [scripts/scrape-creator-centers.mjs](./scripts/scrape-creator-centers.mjs) 小红书缓存键改为 `xhs:发布日期:标题`，同一天同标题的按出现顺序加 `#2`。真实抓取验证：新笔记基线只有 1 条，其余为真实增量，无重复。
@@ -193,7 +193,7 @@ git diff --check
 
 ### 9.4 验证状态
 - 84 个测试通过；`node scripts/build.mjs` 成功；真实抓取 1 次（写入 18 条工作台数据 + 沉淀表 39 条内容、4 行账号，无错误）；面板在真实页面上看过一次。
-- **未验证：** 日增（只有 1 天快照，明天起才有）；抖音逐条表的数值是否为累计值（从 145 涨到 161 看起来是，需两天快照确认）；B站稿件表只覆盖「近期稿件」前几条，更早的不在其中；抖音标题字段带了描述文字（截到 60 字符，作为内容标识的一部分，描述改动会让标识变化）；`publish-xhs.mjs` 打开的页面仍未关闭（与此前 DSH 卡死同类，未改）；`package.json` 的 `files` 不含 `scripts/`，npm 安装的用户按钮会缺脚本（本地链接安装不受影响）。
+- **未验证：** 日增（只有 1 天快照，明天起才有）；抖音逐条表的数值是否为累计值（从 145 涨到 161 看起来是，需两天快照确认）；B站稿件表只覆盖「近期稿件」前几条，更早的不在其中；抖音标题字段带了描述文字（截到 60 字符，作为内容标识的一部分，描述改动会让标识变化）；ego `creator-center scrape` 空间页面已于 2026-11-09 10:38 关闭；`package.json` 的 `files` 不含 `scripts/`，npm 安装的用户按钮会缺脚本（本地链接安装不受影响）。
 
 ### 9.5 运行注意
 - **每次重启 DSH web，token 变化，ego 浏览器里的登录态失效。** 抓取脚本经 ego 里的 DSH 标签同源写入，重启后要先在 ego 里用新链接打开一次，否则写入会 401。当前 DSH web 由 Claude 在终端标签 `c1` 里启动（`dsh web --no-open`）。
